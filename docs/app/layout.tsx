@@ -4,6 +4,7 @@ import { Manrope } from 'next/font/google';
 import { Header } from '@/components/header';
 import { siteConfig } from '@/lib/layout.shared';
 import './global.css';
+import { Analytics } from '@vercel/analytics/next';
 
 const manrope = Manrope({
   subsets: ['latin'],
@@ -31,6 +32,7 @@ export default function Layout({ children }: LayoutProps<'/'>) {
         <RootProvider>
           <Header />
           {children}
+          <Analytics />
         </RootProvider>
       </body>
     </html>
