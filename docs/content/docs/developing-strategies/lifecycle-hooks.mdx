@@ -1,48 +1,77 @@
 ---
 title: Lifecycle Hooks
-description: Strategy hooks are invoked by the worker runtime during context build, turn end, replay, cleanup, and error handling.
+description: Strategy hooks are invoked by the worker runtime during different phases of a conversation lifecycle.
 ---
 
-# Lifecycle Hooks
+#
 
-Looma currently supports a small set of strategy hooks.
+## Overall
+
+Strategies in Looma can export a small set of **lifecycle hooks**.
+
+These hooks are invoked by the worker runtime at different stages of a conversation, allowing strategies to control prompt construction, handle tool calls, write memory, and perform cleanup.
+
+---
 
 ## `onContextBuild`
 
-This is the required hook.
+This is the **required hook**.
 
 It runs before the host starts the model stream and must return the prompt payload for the turn.
+
+Most strategy logic begins here.
+
+---
 
 ## `onInit`
 
 If exported, `onInit` runs when the worker loads the strategy for runtime use.
 
-It is not a settings-page initialization hook.
+This hook runs once per worker instance and can be used to initialize worker-local state.
+
+It is **not related to the settings page or strategy installation**.
+
+---
 
 ## `onTurnEnd`
 
 If exported, `onTurnEnd` runs after the host finishes writing the assistant message and prepares the turn-end context.
 
-This is where memory write or cleanup-style post-processing usually belongs.
+This is typically used for:
+
+- memory writes
+- background updates
+- cleanup-style post-processing
+
+---
 
 ## `onReplayTurn`
 
-If exported, `onReplayTurn` is called during strategy replay jobs when the host replays existing turns for a conversation.
+If exported, `onReplayTurn` runs when the host replays existing turns during a **strategy replay job**.
 
-## `onToolCall`
+Replay jobs may occur when a conversation switches strategies or when background reindexing is required.
 
-If exported, `onToolCall` can handle a tool call inside the strategy runtime.
+---
 
-If it is not exported, the host fallback tool execution path is used instead.
+## `onToolCall` (coming soon)
+
+If exported, `onToolCall` allows the strategy to handle a tool call inside the strategy runtime.
+
+If this hook is not exported, Looma falls back to the host's default tool execution path.
+
+---
 
 ## `onCleanup`
 
-If exported, `onCleanup` runs when the worker is disposed.
+If exported, `onCleanup` runs when the worker instance is disposed.
 
-Use it to release worker-local resources.
+This hook can be used to release worker-local resources.
+
+---
 
 ## `onError`
 
-If exported, `onError` is called when a worker-side request throws.
+If exported, `onError` runs when a worker-side request throws an error.
 
-The runtime passes the last available context, the error, and the request phase.
+#
+#

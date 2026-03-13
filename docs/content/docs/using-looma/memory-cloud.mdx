@@ -1,34 +1,32 @@
 ---
 title: Memory Cloud
-description: Memory Cloud is the conversation-scoped asset and memory surface that appears only for strategies that enable it.
+description: Memory Cloud is a user-managed asset database that strategies can enable and integrate into conversations.
 ---
 
-# Memory Cloud
+#
 
-Memory Cloud is a conversation-level bar for attaching, listing, opening, and removing stored assets.
+## Overview
+
+Memory Cloud is a user-managed asset database that can be enabled by strategies.
+Users can store and organize assets in the cloud, while strategies define how those assets are retrieved and used during conversations.
 
 ## When It Appears
 
-Memory Cloud is not global.
+Memory Cloud is not globally available.
 
-It is only enabled when the active strategy for the conversation declares the Memory Cloud feature.
+It is only enabled when the active strategy declares the Memory Cloud feature.
 
-If the strategy does not enable it, the host returns `enabled: false` for that conversation.
+## How Strategies Use It
 
-## What You Can Do Today
+Strategies control how Memory Cloud assets participate in a conversation.
 
-The current UI supports:
+A strategy may choose to:
 
-- checking whether Memory Cloud is enabled for the conversation
-- uploading files into the conversation memory scope
-- listing stored assets
-- reading asset previews
-- deleting assets
-- opening files from disk
-- revealing files in the system file manager
+- retrieve assets as additional context
+- ignore stored assets entirely
+- selectively load assets based on the conversation state
 
-## Runtime Behavior
+This keeps the platform flexible while allowing different strategies to implement different memory behaviors.
 
-Uploaded files are ingested through the Electron host and written into local storage and memory tables.
-
-The current UI uses `wait: 'load'` for uploads, so assets become readable quickly while deeper indexing can continue afterward.
+#
+#

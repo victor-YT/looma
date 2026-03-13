@@ -3,29 +3,30 @@ title: Strategy Settings
 description: Strategy settings let you enable, disable, configure, and manage available strategies.
 ---
 
-# Strategy Settings
+#
 
-The Strategy settings page is the management surface for available strategies.
-
-## What You Can Do Today
+## Capabilities
 
 The current UI and backend support:
 
 - listing strategies
 - enabling and disabling strategies
-- editing strategy parameter overrides
+- editing strategy configuration
 - viewing usage counts
 - uninstalling strategies
 - reassigning conversations when disabling or uninstalling a strategy
 
-## Config Values
+## Strategy Configuration
 
-If a strategy exposes `configSchema`, Looma can show a configuration dialog and persist the chosen values.
+If a strategy exposes a `configSchema`, Looma can generate a configuration interface automatically.
 
-Those values are later exposed to the strategy through `ctx.config`.
+The chosen values are persisted by the host and later exposed to the strategy through `ctx.config`.
 
 ## Conversation Switching
 
-Changing the active strategy for a conversation is handled separately from the settings list itself.
+Changing the active strategy for a conversation is handled separately from the settings list.
 
-When a switch occurs, the host updates the conversation strategy, updates strategy session tracking, and may schedule replay or background reindexing depending on mode.
+When a switch occurs, the host updates the conversation strategy and may schedule replay or background indexing depending on the strategy mode.
+
+#
+#

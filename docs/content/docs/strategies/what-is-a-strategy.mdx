@@ -1,38 +1,37 @@
 ---
 title: What is a Strategy
-description: A strategy defines how conversations work in Looma.
+description: A strategy defines how conversations behave in Looma.
 ---
 
-# What is a Strategy
+#
 
-Instead of hardcoding AI behavior into the application, Looma separates the system into:
+## Overall
 
-- the **platform**, which handles infrastructure
+In most AI chat applications, conversation behavior is built directly into the product.
+
+Looma takes a different approach.
+
+Instead of hardcoding AI behavior inside the application, Looma separates the system into:
+
+- the **platform**, which provides infrastructure such as models, storage, and tools
 - the **strategy**, which defines how the conversation behaves
 
-This allows Looma to support many different AI chatflows without changing the core application.
+This separation allows Looma to support many different AI chatflows without modifying the core application.
 
 ---
 
 ## What a Strategy Controls
 
-A strategy controls how Looma interacts with the model during a conversation.
+A strategy defines how Looma interacts with the model during a conversation.
 
 This includes decisions such as:
 
 - how prompts are constructed
 - which conversation history is included
-- when tools are used
 - whether memory should be retrieved or stored
-- and more
+- and other conversation behaviors
 
+Strategies allow different conversations to follow different logic while running on the same platform.
 
----
-
-## One Strategy per Conversation
-
-Each conversation runs with a single active strategy.
-
-You can choose a strategy when creating a conversation, and switch strategies later if needed.
-
-Different strategies may behave very differently depending on how they manage context, tools, and memory.
+#
+#

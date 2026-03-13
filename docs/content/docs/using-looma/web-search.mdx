@@ -1,38 +1,42 @@
 ---
 title: Web Search
-description: Web search is a host-owned capability that can be enabled in settings and used by compatible model/tool flows.
+description: Web search allows Looma conversations to access information from the internet.
 ---
 
-# Web Search
+#
 
-Web search in Looma is host-owned.
+## How It Works
 
-Strategies do not open network windows directly. The host controls the web search path.
+Web search can be enabled for a conversation using the **Web Search icon** below the input area.
+When enabled, Looma allows the conversation to retrieve information from the internet.
+Looma supports two different ways to perform web search.
 
-## Current User Settings
+## Model Native Search
 
-The settings UI currently exposes:
+Some models provide **built-in web search capabilities**.
+In the model select panel, these models display a **web search icon**.
+When such a model is selected, Looma will use the model's **native search mode** directly during the conversation.
 
-- enable or disable web search
-- result limit
-- a fixed engine label shown as `Bing (Local)`
+## Looma Web Search Tool
 
-## Runtime Behavior
+If the selected model does not support native search, Looma can perform web search through its **built-in search tools**.
+This requires the model to support **tool usage**.
+In this mode, the model calls Looma's search tools to retrieve web results and use them in the response.
 
-At runtime, Looma currently supports host-mediated search and fetch flows through built-in tools such as:
+When Looma performs a tool-based web search, the process follows two steps.
 
-- `builtin.web_search`
-- `builtin.web_fetch`
+First, Looma sends the search query to the search engine and retrieves the top N relevant webpages. The value of N can be configured in Settings → Web Search → Limit, with a default of 5.
 
-There is also a host-side hidden-window HTML fetch path for approved search hosts.
+After the results are returned, the model selects the webpages it considers relevant and retrieves their content for further reading before generating the final response.
 
-## Important Distinction
+## When Search Is Not Available
 
-Whether web search is actually used on a turn depends on all of these:
+If the selected model supports **neither native search nor tool usage**, web search cannot be used in the conversation.
 
-- app-level web search settings
-- model capabilities
-- tool availability
-- strategy allowlist/tool exposure
+## Search Provider
 
-So enabling web search in settings does not force every turn to use it.
+Looma currently performs tool-based searches using a **local Bing browser session**.
+This approach is free to use but may not always guarantee the accuracy of search results.
+
+#
+#

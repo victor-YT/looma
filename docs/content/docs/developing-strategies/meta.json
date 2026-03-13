@@ -3,7 +3,6 @@
   "pages": [
     "development-workflow",
     "dev-conversation",
-    "dev-panel",
     "strategy-file",
     "lifecycle-hooks",
     "config-schema"

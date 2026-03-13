@@ -1,32 +1,43 @@
 ---
 title: Dev Conversation
-description: A dev conversation is a normal conversation that is opened with a dev strategy attached.
+description: A dev conversation lets you test a strategy inside the normal Looma runtime.
 ---
 
-# Dev Conversation
+#
 
-A dev conversation is not a separate runtime type.
+A **Dev Conversation** is not a separate runtime mode.
 
-It is a normal Looma conversation that has been opened and assigned to a saved dev strategy.
+It is a normal Looma conversation that is opened with a development strategy attached.
+
+In addition to the standard chat interface, Looma also opens a **development inspector panel** that exposes runtime information about the conversation.
+
+---
 
 ## What Happens When You Open One
 
-The current dev flow:
+When a Dev Conversation is opened, Looma:
 
-1. saves or reloads a dev strategy bundle
-2. creates or opens a conversation
-3. switches that conversation to the dev strategy
+1. creates or opens a conversation
+2. assigns the conversation to the dev strategy
+3. opens the development inspector panel
 
-After that, the conversation uses the same host send pipeline as any other conversation.
+After that, the conversation runs through the same message pipeline as any other Looma conversation.
 
-## Why This Matters
+---
 
-This means dev strategies are tested in the real runtime path:
+## Development Inspector
 
-- real IPC
-- real context build
-- real streaming
-- real persistence
-- real worker calls
+The Dev Conversation includes a runtime inspector that shows internal information for each turn.
 
-That is why dev conversations are more useful than a pure isolated preview.
+This includes:
+
+- turn state and worker status
+- runtime logs for the current turn
+- prompt construction stages
+- model call timing
+- conversation configuration and strategy settings
+
+The inspector helps developers understand how their strategy interacts with the model and the Looma runtime.
+
+#
+#

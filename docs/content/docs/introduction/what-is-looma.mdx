@@ -25,9 +25,9 @@ This means every AI application must constantly answer questions like:
 - What conversation history should be included?
 - What information should be removed to fit token limits?
 - When should knowledge be retrieved?
-- When should the system call tools?
+- and more.
 
-Most applications hide this logic inside the product.
+Most applications hide this logic deep inside the product.
 
 Looma exposes it.
 
@@ -39,7 +39,7 @@ In Looma, the behavior of a conversation is defined by a **strategy**.
 
 A strategy is a small TypeScript module that controls how the system interacts with the model.
 
-Strategies define the **chat flow** of a conversation:
+Strategies define the **flow** of a conversation:
 
 - how prompts are constructed
 - which context should be included
@@ -61,14 +61,7 @@ Attachments are also managed through local storage paths and local ingest flows.
 
 This keeps the system fast and private while still allowing cloud models when needed.
 
-The platform handles the heavy infrastructure work:
-
-- model provider integration
-- token budgeting
-- tool execution
-- file ingestion
-- retrieval-augmented generation
-
+The platform handles the heavy infrastructure work.
 Strategies only focus on defining conversation behavior.
 
 ---

@@ -4,67 +4,48 @@ description: Start your first conversation in Looma.
 ---
 
 #
+
 ## Create a Conversation
 
 Open Looma and click **New Conversation** in the sidebar.
 
-This creates a new chat session where Looma will manage the conversation context and execution.
+Choose a **model** and a **strategy**, then start chatting.
 
 ---
 
 ## Configure a Model
 
-Before sending a message, you need to configure at least one model provider.
-Go to **Settings → Models** and add your provider.
-
-Once the provider is connected, you will see a list of available models.
+Before sending a message, you need to configure at least one model.
+Go to **Settings → Models** and find your provider.
 Turn on the toggle next to the models you want to use.
 
 Only enabled models will appear in the **model selector** in the chat input.
-
-Looma supports both cloud and local models.
 
 Common options include:
 
 - API-based providers (OpenAI, Anthropic, etc.)
 - Local model servers such as **Ollama** or **LM Studio** (the server must be running)
 
-Once configured, select the model you want to use for the conversation.
-
 ---
 
 ## Choose a Strategy
 
 Every Looma conversation runs with a **strategy**.
-A strategy defines how the conversation works, including how context is built and how tools or memory may be used.
+A strategy defines how the conversation works, including how context is built and how memory may be used.
 
-Looma includes several built-in strategies.
+Looma includes several built-in strategies:
 
-Examples include:
-
-**Standard Chat**
-
+**Standard Chat**:
 A simple conversational strategy focused on natural dialogue.
 
-**Research Assistant**
-
+**Research Assistant**:
 Optimized for gathering and summarizing information.
 
-**Memory Chat**
-
+**Memory Chat**:
 Enables long-term knowledge storage and retrieval during conversations.
 
 You can switch strategies at any time in the conversation settings.
 
----
-
-## Send Your First Message
-
-Type a message in the input box and press **Enter**.
-
-Looma will construct the conversation context using the selected strategy and send it to the model.
-
-The response will appear in the chat window.
 
 #
 #

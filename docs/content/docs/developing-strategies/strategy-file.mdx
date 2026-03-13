@@ -3,9 +3,7 @@ title: Strategy File
 description: A Looma strategy is a single TypeScript module with exported metadata and hooks.
 ---
 
-# Strategy File
-
-A Looma strategy is currently a single `.ts` module loaded by the strategy worker.
+#
 
 ## Required Structure
 
@@ -56,4 +54,7 @@ The worker loader currently recognizes:
 - `onError`
 - `onToolCall`
 
-You can export them either at module top level or through a `hooks` object. The loader normalizes both forms.
+You can export them through a `hooks` object.
+
+#
+#

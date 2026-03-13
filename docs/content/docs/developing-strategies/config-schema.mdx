@@ -1,35 +1,50 @@
 ---
 title: Config Schema
-description: configSchema defines strategy-configurable fields that show up in the Looma strategy UI.
+description: configSchema defines configurable strategy parameters that appear in the Looma strategy UI.
 ---
 
-# Config Schema
+#
 
-`configSchema` is the static configuration schema exported by a strategy module.
+## How It Works
 
-## What It Is Used For
+When a strategy is installed, Looma stores the `configSchema` as part of the strategy metadata.
 
-The host stores the schema in strategy metadata and uses it to render strategy configuration controls in the UI.
+The host uses this schema to automatically generate configuration controls in the strategy settings UI.
 
-Those saved values are then exposed to the strategy at runtime through `ctx.config`.
+The values chosen by the user are persisted by Looma and exposed to the strategy at runtime through `ctx.config`.
 
-## Current Constraints
+---
 
-In the current implementation:
+## Requirements
 
-- `configSchema` must be JSON-serializable
-- the dev sandbox validates that it can be serialized
-- the worker loader accepts it as optional metadata
+`configSchema` must follow a few constraints:
 
-If serialization fails, the dev compile/test flow rejects the strategy.
+- it must be JSON-serializable
+- the dev sandbox verifies that it can be serialized
+- the worker loader reads it as optional strategy metadata
 
-## Practical Guidance
+If serialization fails, the dev compile/test step rejects the strategy.
 
-Use `configSchema` for strategy behavior settings such as:
+---
+
+## When to Use It
+
+Use `configSchema` for **strategy behavior settings**, such as:
 
 - retrieval limits
 - prompt style toggles
 - history depth
 - memory-related options
 
-Do not use it as a replacement for model-provider settings.
+These settings allow strategies to adjust behavior without modifying the strategy code.
+
+---
+
+## When Not to Use It
+
+`configSchema` should not be used for **model or provider configuration**.
+
+Model settings such as temperature, model selection, or provider credentials belong in Looma's model settings system, not inside strategies.
+
+#
+#

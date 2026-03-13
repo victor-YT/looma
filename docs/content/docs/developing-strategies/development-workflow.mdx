@@ -3,33 +3,31 @@ title: Development Workflow
 description: The current development loop compiles a strategy file, runs a sandbox smoke test, saves it, and reloads it into Looma.
 ---
 
-# Development Workflow
-
-The current dev workflow is file-based.
+#
 
 ## Current Loop
 
 The live flow is:
 
-1. write a `.ts` strategy file
-2. compile and smoke-test it
-3. save it into Looma's dev strategy storage
-4. reload it so worker runtimes pick up the new bundle
-5. open a conversation bound to that dev strategy
+1. Download the **strategy template**.
+2. Implement your strategy logic in the `.ts` file.
+3. Drop the file into the **Write Strategy** panel.
+4. Looma validates the strategy in a sandbox environment.
+5. If validation succeeds, the strategy is added to **Personal strategies**.
+6. You can then start a conversation using the new strategy.
 
-## What the Dev Service Does
+## Personal Strategy Tools
 
-The dev backend currently supports:
+Once a strategy is installed, it appears in the **Personal** section.
 
-- compile and sandbox test
-- save
-- reload
-- snapshot retrieval
-- open dev chat
-- open source folder
-- remove dev strategy
+From there you can:
 
-This is the actual runtime behavior wired through `strategyDevService`.
+- open a **Dev Chat** to test the strategy
+- **reload** the strategy after editing the file
+- open the **Settings** panel for configuration
+- **enable or disable** the strategy
+- **delete** the strategy
+- view how many conversations are using it
 
 ## What the Sandbox Validates
 
@@ -40,11 +38,5 @@ The sandbox checks that the module:
 - has a serializable `configSchema`
 - can execute a basic worker-side smoke pass
 
-## Recommended Iteration Pattern
-
-Use this order when iterating:
-
-1. get `onContextBuild` working first
-2. verify prompt output in the dev panel
-3. add memory and tool usage later
-4. add `onTurnEnd` only after the core prompt path is stable
+#
+#
