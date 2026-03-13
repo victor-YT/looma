@@ -3,6 +3,22 @@
   "productName": "Looma",
   "private": true,
   "version": "0.1.0",
+  "build": {
+    "appId": "com.looma.app",
+    "productName": "Looma",
+    "directories": {
+      "buildResources": "build"
+    },
+    "mac": {
+      "icon": "build/icon.icns"
+    },
+    "win": {
+      "icon": "build/icon.ico"
+    },
+    "linux": {
+      "icon": "build/icon.png"
+    }
+  },
   "packageManager": "pnpm@10.32.0",
   "type": "module",
   "scripts": {
