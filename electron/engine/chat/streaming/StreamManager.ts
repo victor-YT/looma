@@ -362,7 +362,7 @@ export class StreamManager extends EventEmitter {
                 }
                 const startedAt = Date.now()
                 try {
-                    const result = await strategyHost.runToolCall({ conversationId, turnId, call })
+                    const result = await strategyHost.runToolCall({ conversationId, turnId, messageId: replyId, call })
                     streamLog('debug', 'TOOL_EXECUTED', {
                         name: call.name,
                         ms: Date.now() - startedAt,

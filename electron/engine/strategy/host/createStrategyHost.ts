@@ -250,17 +250,12 @@ export class StrategyHost {
                 content_parts?: string | null
             } | undefined
             const modelConfig = row?.model ? getModelById(row.model) : undefined
-            const modelProvider = modelConfig?.provider
-            const usage = row?.usage_tokens_prompt || row?.usage_tokens_completion
-                ? {
-                    inputTokens: row?.usage_tokens_prompt ?? undefined,
-                    outputTokens: row?.usage_tokens_completion ?? undefined,
-                    totalTokens: row?.usage_tokens_prompt && row?.usage_tokens_completion
-                        ? row.usage_tokens_prompt + row.usage_tokens_completion
-                        : undefined,
-                }
-                : null
-            const finishReason = typeof row?.finish_reason === 'string' ? row.finish_reason : null
+            const finishReason = row?.finish_reason === 'stop'
+                || row?.finish_reason === 'length'
+                || row?.finish_reason === 'tool_calls'
+                || row?.finish_reason === 'error'
+                ? row.finish_reason
+                : undefined
             const status = row?.status === 'completed'
                 ? 'completed'
                 : row?.status === 'stopped'
@@ -278,16 +273,6 @@ export class StrategyHost {
                     return undefined
                 }
             })()
-            const rawError = (() => {
-                if (row?.status !== 'error') return undefined
-                if (!row?.content_parts || !row.content_parts.trim()) return undefined
-                try {
-                    const parsed = JSON.parse(row.content_parts) as Record<string, unknown>
-                    return parsed.attachmentError ?? parsed
-                } catch {
-                    return row.content_parts
-                }
-            })()
             await workerManager.requestTurnEnd(args.conversationId, {
                 ...args,
                 scope,
@@ -298,13 +283,9 @@ export class StrategyHost {
                 devMode: isDev,
                 message: {
                     id: row?.id ?? args.messageId,
-                    content: row?.content ?? null,
-                    status,
+                    role: 'assistant',
+                    content: typeof row?.content === 'string' && row.content.length > 0 ? row.content : null,
                     finishReason,
-                    model: row?.model ? { id: row.model, provider: modelProvider ?? '' } : null,
-                    usage,
-                    errorCode: row?.error_code ?? null,
-                    rawError,
                     toolCalls,
                 },
             })
@@ -404,6 +385,7 @@ export class StrategyHost {
     async runToolCall(args: {
         conversationId: string
         turnId: string
+        messageId?: string
         call: { id: string; name: string; args?: unknown }
     }): Promise<string> {
         const t0 = Date.now()
@@ -433,6 +415,13 @@ export class StrategyHost {
                     strategyId: strategyRecord.id,
                     source: strategyRecord.source ?? null,
                 }),
+                message: {
+                    id: args.messageId ?? `${args.turnId}:${args.call.id}`,
+                    role: 'assistant',
+                    content: null,
+                    finishReason: 'tool_calls',
+                    toolCalls: [toBlueprintToolCall(args.call)],
+                },
             })
             if (typeof result === 'string') return result
             const parsed = result as { resultText?: string; ok?: boolean; error?: { message?: string; type?: string; tool?: string; timeoutMs?: number } }

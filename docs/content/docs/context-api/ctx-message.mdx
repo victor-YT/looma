@@ -1,40 +1,94 @@
 ---
 title: ctx.message
-description: ctx.message is populated for turn-end style hooks and is null during context build.
+description: ctx.message represents the assistant message produced in the current turn.
 ---
 
 #
 
-## Overview
-
-`ctx.message` represents the current assistant message payload when the host invokes hooks that run after generation.
-
 ## When It Exists
 
-In normal context-build execution, `ctx.message` is `null`.
+`ctx.message` represents the assistant message generated during the current turn.
 
-It is populated when the host invokes hooks such as `onTurnEnd`.
+This value is only available in **post-turn hooks** that run after the model finishes generating a response.
 
-## Current Fields
+During prompt construction (`onContextBuild`), `ctx.message` is always `null`.
 
-The current runtime shape includes:
+It becomes populated when the host invokes hooks such as:
 
-- `id`
-- `content`
-- `status`
-- `toolCalls`
-- `finishReason`
-- `model`
-- `usage`
-- `errorCode`
-- `rawError`
+- `onTurnEnd`
+- `onToolCall`
+- `onError`
 
-This data is assembled by the host from the persisted assistant row and related metadata.
+In these hooks, `ctx.message` refers to the assistant message that was just produced.
+
+---
+
+## Shape
+
+```ts
+interface TurnMessage {
+  id: string
+  role: 'assistant'
+  content: string | null
+  finishReason?: 'stop' | 'length' | 'tool_calls' | 'error'
+  toolCalls?: ToolCall[]
+}
+```
+
+### Fields
+
+- `id` – unique identifier of the assistant message
+- `role` – always `"assistant"`
+- `content` – textual content produced by the model
+- `finishReason` – reason the model stopped generating
+- `toolCalls` – tool calls issued during this turn (if any)
+
+`content` may be `null` in cases such as:
+
+- the model produced only tool calls
+- generation failed
+- the turn was aborted
+
+---
 
 ## Practical Use
 
-Strategies typically use `ctx.message` to decide whether to:
+Strategies typically use `ctx.message` in post-turn hooks to:
 
 - skip post-processing after aborted or failed turns
-- retire or write memory entries tied to a source message
-- inspect tool-call history after a turn completes
+- extract structured memory from generated text
+- inspect tool calls produced during the turn
+
+Example:
+
+```ts
+export async function onTurnEnd(ctx) {
+  if (!ctx.message) return
+
+  if (ctx.message.finishReason !== 'stop') {
+    return
+  }
+
+  const text = ctx.message.content
+  if (!text) return
+
+  // perform memory extraction or post-processing
+}
+```
+
+---
+
+## Notes
+
+`ctx.message` represents **only the assistant message generated in the current turn**.
+
+It does not expose earlier messages.
+
+To access conversation history, use:
+
+```
+ctx.history
+```
+
+#
+#

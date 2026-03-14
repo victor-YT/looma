@@ -544,6 +544,7 @@ parentPort.on('message', async (req: StrategyWorkerRequest | WorkerEnvelope) => 
                     model: payload.model,
                     strategyId: payload.strategyId,
                     configValues: payload.configValues,
+                    message: payload.message ?? null,
                     dev: { emit: (event) => emitDevEvent({ ...event, phase: resolvePhaseForEvent(event, 'turnEnd') }) },
                 })
                 lastCtx = ctx

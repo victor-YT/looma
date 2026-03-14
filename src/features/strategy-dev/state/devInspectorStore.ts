@@ -139,13 +139,6 @@ function applyEvent(turn: DevTurnData, event: StrategyDevEvent): DevTurnData {
             break
         case "context":
             next.inputEvent = event
-            if (event.data?.message?.usage) {
-                next.usage = {
-                    inputTokens: event.data.message.usage.inputTokens ?? undefined,
-                    outputTokens: event.data.message.usage.outputTokens ?? undefined,
-                    totalTokens: event.data.message.usage.totalTokens ?? undefined,
-                }
-            }
             break
         case "prompt":
             next.promptEvent = event

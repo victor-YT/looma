@@ -143,15 +143,11 @@ export type Input = {
 }
 
 export type LoomaMessage = {
-    id: string | null
+    id: string
+    role: 'assistant'
     content: string | null
-    status: 'completed' | 'aborted' | 'error' | null
     toolCalls?: ToolCall[]
-    finishReason?: 'stop' | 'length' | 'tool_calls' | 'error' | null
-    model?: { id: string; provider: string } | null
-    usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number } | null
-    errorCode?: string | null
-    rawError?: unknown
+    finishReason?: 'stop' | 'length' | 'tool_calls' | 'error'
 }
 
 export type HistoryHelper = {
