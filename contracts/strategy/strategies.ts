@@ -253,6 +253,7 @@ export type MemoryIngestInput = MemoryIngestSource | MemoryIngestSource[]
 
 export type ToolsAPI = {
     llm: {
+        call(input: string | Message[]): Promise<Message>
         call(
             messages: LLMMessage[],
             options?: {

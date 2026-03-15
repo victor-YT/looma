@@ -1,5 +1,6 @@
 import type {
     Attachment,
+    Message,
     LLMMessage,
     LLMModelConfig,
     LoomaContext,
@@ -48,6 +49,62 @@ type IngestItemSummary = {
     mime?: string
     textLength?: number
     dataBytes?: number
+}
+
+type LegacyLLMCallOptions = {
+    tools?: ToolDefinition[]
+    toolChoice?: ToolChoice
+    temperature?: number
+}
+
+function isValidLLMRole(role: unknown): role is LLMMessage['role'] {
+    return role === 'system' || role === 'user' || role === 'assistant' || role === 'tool'
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value && typeof value === 'object')
+}
+
+function cloneValidatedLLMMessage(message: unknown, index: number): LLMMessage {
+    if (!isRecord(message)) {
+        throw new Error(`llm.call input at index ${index} must be a message object`)
+    }
+    const role = message.role
+    if (!isValidLLMRole(role)) {
+        throw new Error(`llm.call input at index ${index} has invalid role`)
+    }
+    const content = message.content
+    if (typeof content !== 'string' && content !== null) {
+        throw new Error(`llm.call input at index ${index} has invalid content`)
+    }
+    return {
+        ...(message as LLMMessage),
+        role,
+        content,
+    }
+}
+
+function normalizeLLMCallMessages(input: string | Message[] | LLMMessage[]): LLMMessage[] {
+    if (typeof input === 'string') {
+        return [{ role: 'user', content: input }]
+    }
+    if (!Array.isArray(input)) {
+        throw new Error('llm.call input must be a string or message array')
+    }
+    return input.map((message, index) => cloneValidatedLLMMessage(message, index))
+}
+
+function normalizeAssistantMessage(message: unknown): Message {
+    if (isRecord(message) && message.role === 'assistant') {
+        return {
+            role: 'assistant',
+            content: typeof message.content === 'string' ? message.content : '',
+        }
+    }
+    return {
+        role: 'assistant',
+        content: '',
+    }
 }
 
 function summarizeText(value: string, max = 160): { length: number; preview: string } {
@@ -120,14 +177,15 @@ export function createToolsApi(args: {
 
     return {
         llm: {
-            call: async (
-                messages: LLMMessage[],
-                options?: { tools?: ToolDefinition[]; toolChoice?: ToolChoice; temperature?: number },
-            ): Promise<LLMMessage> => {
+            call: (async (
+                input: string | Message[] | LLMMessage[],
+                options?: LegacyLLMCallOptions,
+            ): Promise<Message | LLMMessage> => {
                 if (!model) {
                     throw new Error('model missing for llm.call')
                 }
-                const input = {
+                const messages = normalizeLLMCallMessages(input)
+                const requestInput = {
                     messages,
                     tools: options?.tools,
                     toolChoice: options?.toolChoice,
@@ -143,14 +201,15 @@ export function createToolsApi(args: {
                         toolChoice: options?.toolChoice,
                         temperature: options?.temperature,
                     })
-                    emitTools({ action: 'llm.call', input, output: result })
-                    return result
+                    emitTools({ action: 'llm.call', input: requestInput, output: result })
+                    if (options) return result
+                    return normalizeAssistantMessage(result)
                 } catch (err) {
                     const msg = err instanceof Error ? err.message : String(err)
-                    emitTools({ action: 'llm.call', input, error: msg })
+                    emitTools({ action: 'llm.call', input: requestInput, error: msg })
                     throw err
                 }
-            },
+            }) as LoomaContext['tools']['llm']['call'],
             run: async (options: {
                 messages: LLMMessage[]
                 tools?: ToolDefinition[]
