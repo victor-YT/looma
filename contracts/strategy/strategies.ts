@@ -89,7 +89,7 @@ export type StrategyConfigEntry = {
 
 export type StrategyConfigSchema = StrategyConfigEntry[]
 
-export type StrategyMessageRole = Extract<Role, 'user' | 'assistant' | 'system'>
+export type StrategyMessageRole = Extract<Role, 'user' | 'assistant' | 'system' | 'tool'>
 
 export type Attachment = {
     id: string

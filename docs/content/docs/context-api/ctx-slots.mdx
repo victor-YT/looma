@@ -3,50 +3,270 @@ title: ctx.slots
 description: ctx.slots is the prompt assembly API used by strategies during context build.
 ---
 
-# ctx.slots
+#
 
-`ctx.slots` is the current prompt assembly API used by built-in strategies and by the strategy template.
+## Shape
 
-## Available Methods
+```ts
+interface Slots {
+  add(
+    name: string,
+    content: string | Message | Message[] | null,
+    options?: {
+      priority?: number
+      maxRatio?: number
+      minRatio?: number
+      minTokens?: number
+      position?: number
+      role?: 'system' | 'user' | 'assistant' | 'tool'
+      trimBehavior?: 'char' | 'message'
+    }
+  ): void
 
-The worker runtime currently exposes:
+  render(): { messages: Message[] }
+}
+```
 
-- `ctx.slots.add(name, content, options?)`
-- `ctx.slots.render()`
+## Overview
 
-## What `add(...)` Accepts
+`ctx.slots` is the prompt assembly API used during context construction.
 
-You can add:
+Strategies add prompt components into named slots, and the runtime later composes them into the final prompt based on ordering rules and token budget constraints.
 
-- a string
+Slots allow strategies to organize prompt components such as:
+
+- system instructions
+- retrieval results
+- memory blocks
+- conversation history
+- the current user input
+
+## add(name, content, options?)
+
+Adds content to a named slot.
+
+The content may be:
+
+- a `string`
 - a single `Message`
 - an array of `Message`
 - `null`
 
-The host normalizes these into prompt messages.
+If a string is provided, it will be converted into a message using the specified role or the default `user` role.
 
-## Current Options That Matter
+Arrays of messages are treated as a logical group and participate in trimming together unless char-level trimming is enabled.
 
-The current implementation actively uses these options:
+## Options
 
-- `priority`
-- `position`
-- `role`
-- `trimBehavior`
-- `minTokens`
+### priority
 
-These affect ordering and trimming behavior.
+Controls how resistant a slot is to trimming.
 
-## Render Behavior
+Higher priority slots are preserved before lower priority ones when the prompt must be reduced to fit the token budget.
 
-`ctx.slots.render()` returns:
+**Range:** Any integer
 
-```ts
+**Default:** 0
+
+If multiple slots share the same priority, trimming follows slot order and removes older content first.
+
+When all slots use the default priority (0), system messages are preserved and will not be trimmed.
+If priorities are explicitly assigned, system messages participate in trimming according to their priority.
+
+**Example:**
+
+```
+priority: 100
+```
+
+Used to protect important prompt sections such as system prompts or critical memory blocks.
+
+---
+
+### maxRatio
+
+The maximum share of the prompt budget that this slot may occupy.
+
+The ratio is calculated relative to:
+
+```
+ctx.budget.remainingInputTokens
+```
+
+**Range:** 0.0 – 1.0
+
+**Default:** 1.0
+
+Limits the maximum size of the slot relative to the total prompt budget.
+
+If the slot exceeds the allowed share, it will be trimmed according to `trimBehavior`.
+
+Ratios across different slots are independent. If their combined maximum exceeds the available budget, trimming is resolved by priority and slot order.
+
+**Example:**
+
+```
+maxRatio: 0.4
+```
+
+This means the slot may use at most 40% of the available prompt budget.
+
+---
+
+### minRatio
+
+The minimum share of the prompt budget this slot should retain during trimming.
+
+**Range:** 0.0 – 1.0
+
+**Default:** 0
+
+Ensures the slot keeps at least a certain proportion of the prompt budget even when aggressive trimming occurs.
+
+minRatio cannot exceed maxRatio. If both are defined and minRatio is larger than maxRatio, the runtime clamps minRatio to maxRatio.
+
+If both `minRatio` and `minTokens` are defined, the runtime preserves whichever results in a larger retained size.
+
+**Example:**
+
+```
+minRatio: 0.1
+```
+
+This means the slot attempts to preserve at least 10% of the prompt budget.
+
+---
+
+### minTokens
+
+A hard lower bound used when the ratio-based minimum would be too small.
+
+**Range:** Any positive integer
+
+**Default:** 0
+
+Acts as a safety floor for very small prompt budgets.
+
+When both `minRatio` and `minTokens` are present, the runtime preserves whichever produces the larger retained size.
+
+**Example:**
+
+```
+minTokens: 200
+```
+
+---
+
+### position
+
+Controls ordering of slots in the final prompt.
+
+Lower values appear earlier in the prompt.
+
+**Range:** Any integer
+
+**Default:** Follows the order of `add()` calls.
+
+If two slots share the same position, the earlier `add()` call appears first.
+
+**Example:**
+
+```
+position: 10
+```
+
+---
+
+### role
+
+Overrides the role assigned to content when it is converted into a message.
+
+**Allowed values:** system, user, assistant, tool
+
+**Default:** user (when content is a string)
+
+Allows strategies to explicitly control the role used in the final prompt.
+
+**Example:**
+
+```
+role: "system"
+```
+
+---
+
+### trimBehavior
+
+Controls how trimming occurs when the slot exceeds its allowed budget.
+
+**Allowed values:** char, message
+
+**Default:** message
+
+`message`
+Removes entire messages starting from the oldest entries.
+
+`char`
+Trims message content by characters rather than removing entire messages.
+Char trimming only affects message content and does not alter message roles or message structure.
+
+**Example:**
+
+```
+trimBehavior: "char"
+```
+
+---
+
+## render()
+
+Renders the final prompt.
+
+The rendering pipeline performs the following steps:
+
+1. collect slots
+2. sort by position / add order
+3. compute slot budgets (ratio + min)
+4. apply trimming (priority + trimBehavior)
+5. assemble messages
+
+The result is returned as:
+
+```
 { messages: Message[] }
 ```
 
-The current implementation sorts slots, applies token-budget trimming, and then returns the final message list.
+## Usage
 
-## Important Note
+Typical usage inside `onContextBuild`:
 
-The slot API types also include `maxRatio` and `minRatio`, but those ratio-based controls are not currently enforced by the live implementation.
+```ts
+export async function onContextBuild(ctx) {
+  ctx.slots.add(
+    "system",
+    "You are a helpful assistant.",
+    { role: "system", priority: 100 }
+  )
+
+  ctx.slots.add(
+    "history",
+    ctx.history.recent(10),
+    { trimBehavior: "message", maxRatio: 0.5 }
+  )
+
+  ctx.slots.add("input", ctx.input)
+
+  return ctx.slots.render()
+}
+```
+
+## Notes
+
+Slots provide a structured way to manage prompt composition while respecting the token budget.
+
+Strategies should prefer ratio-based constraints (`maxRatio` / `minRatio`) rather than hard token limits so that behavior remains consistent across models with different context sizes.
+
+If the combined minimum requirements of all slots exceed the available token budget, the runtime falls back to priority-based trimming and ignores minRatio and minTokens constraints.
+
+#
+#
