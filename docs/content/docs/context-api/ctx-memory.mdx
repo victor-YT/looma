@@ -1,6 +1,6 @@
 ---
 title: ctx.memory
-description: ctx.memory provides ingestion, retrieval, asset reads, and retirement operations for strategy memory.
+description: ctx.memory provides access to the strategy memory system, including ingestion, retrieval, and asset reads.
 ---
 
 #
@@ -9,152 +9,279 @@ description: ctx.memory provides ingestion, retrieval, asset reads, and retireme
 
 ```ts
 interface MemoryAPI {
-  query(options?: MemoryQueryOptions): Promise<UIMemoryCloudItem[]>
+  query(options?: MemoryQueryOptions): Promise<MemoryRecord[]>
   search(query: string, options?: MemorySearchOptions): Promise<MemoryHit[]>
   ingest(
     input: MemoryIngestInput,
     options?: MemoryIngestOptions
   ): Promise<MemoryIngestResult | MemoryIngestResult[]>
-  readAsset(asset: Attachment | string, maxChars?: number): Promise<string>
-  retireBySourceMessage(messageId: string): Promise<{ retired: number }>
-  retireMemory(memoryId: string): Promise<{ retired: boolean }>
+  readAsset(asset: Attachment | string, options?: ReadAssetOptions): Promise<string>
+  removeMemory(memoryId: string): Promise<{ deleted: boolean }>
 }
 ```
 
 ## Overview
 
-`ctx.memory` is the strategy-facing memory API.
+`ctx.memory` provides access to Looma's strategy memory system.
 
-It lets strategies:
+It allows strategies to ingest content, query stored memory records, run retrieval, and read back asset content when building prompts.
 
-- ingest new text or assets
-- list memory records
-- run semantic retrieval
-- read stored asset content back into context
-- retire memory created from a message or a specific record
+The runtime handles storage, chunking, indexing, and retrieval internally, so strategies control what to store and how to use it, while the runtime manages storage and retrieval.
 
-The runtime handles storage, parsing, chunking, and indexing.
+Typical use cases include:
 
-## query(options?)
+- retrieval augmented generation (RAG)
+- long-term knowledge storage
+- document understanding
+- memory-backed prompt construction
+- conversation summarization
 
-Lists memory records for the current conversation.
+## Methods
 
-Common filters include:
+### ingest(input, options?)
 
-- `tags`
-- `types`
-- `sources`
-- `ttl`
-- `status`
-- `limit`
-- `offset`
+Ingests content into memory.
 
+The runtime may parse the input, create an asset, split content into chunks, and optionally index it for semantic retrieval, depending on the input type and options.
+
+**input:** `MemoryIngestInput`
+
+Supported inputs include:
+
+- raw text
+- an asset reference such as `{ assetId }`
+- an inline document payload such as `{ text, filename, mime }`
+- an array of the inputs above
+
+**options:** `MemoryIngestOptions`
+
+```ts
+interface MemoryIngestOptions {
+
+  /**
+   * Controls how much processing to wait for before resolving.
+   *
+   * - 'load' → resolve after content is stored
+   * - 'full' → resolve after full processing (including chunking and indexing)
+   *
+   * Default: 'full'
+   */
+  wait?: 'load' | 'full'
+
+  /**
+   * Defines how the content should be processed.
+   *
+   * - 'raw'   → store only, no chunking or indexing
+   * - 'chunk' → split into chunks, no indexing
+   * - 'rag'   → chunk + indexing (for retrieval)
+   *
+   * Default: 'rag'
+   */
+  mode?: 'raw' | 'chunk' | 'rag'
+
+  /**
+   * Tags used for filtering and categorization.
+   */
+  tags?: string[]
+
+  /**
+   * Arbitrary structured metadata.
+   */
+  meta?: Record<string, any>
+
+}
+```
+
+**Return:** `Promise<MemoryIngestResult | MemoryIngestResult[]>`
 Example:
 
 ```ts
+await ctx.memory.ingest('Project roadmap for 2025', {
+  tags: ['roadmap']
+})
+```
+
+---
+
+### query(options?)
+
+Returns memory records for the current conversation.
+
+This is used to list or filter stored memory before selecting content to include in the context.
+
+**options:** `MemoryQueryOptions`
+
+```ts
+interface MemoryQueryOptions {
+
+  /**
+   * Filters records that contain all specified tags.
+   */
+  tags?: string[]
+
+  /**
+   * Field used for sorting.
+   *
+   * Default: 'updatedAt'
+   */
+  orderBy?: 'updatedAt' | 'createdAt'
+
+  /**
+   * Sort direction.
+   *
+   * Default: 'desc'
+   */
+  order?: 'desc' | 'asc'
+
+  /**
+   * Maximum number of records to return.
+   *
+   * Default: 20
+   */
+  limit?: number
+
+  /**
+   * Number of records to skip.
+   *
+   * Default: 0
+   */
+  offset?: number
+}
+```
+
+**Return:** `Promise<MemoryRecord[]>`
+
+Example:
+
+
+```ts
 const items = await ctx.memory.query({
-  sources: ["pinned"],
-  orderBy: "updatedAt",
-  order: "desc",
+  tags: ['pinned'],
   limit: 20
 })
 ```
 
-## search(query, options?)
+---
 
-Runs semantic retrieval over indexed memory content.
+### search(query, options?)
 
-Common options include:
+Runs retrieval against indexed memory content.
 
-- `topK`
-- `embeddingProfile`
-- `threshold`
-- `tags`
-- `types`
-- `sources`
+Unlike `query`, this method performs semantic search and returns ranked results based on relevance.
+
+**query:** `string`
+
+The text query used for retrieval.
+
+**options:** `MemorySearchOptions`
 
 ```ts
-const hits = await ctx.memory.search("project roadmap", {
+interface MemorySearchOptions {
+
+  /**
+   * Maximum number of results to return.
+   *
+   * Default: 5
+   */
+  topK?: number
+
+  /**
+   * Filters results by tags.
+   */
+  tags?: string[]
+
+}
+```
+
+**Return:** `Promise<MemoryHit[]>`
+
+Example:
+
+```ts
+const hits = await ctx.memory.search('project roadmap', {
   topK: 5
 })
 ```
 
-## ingest(input, options?)
+---
+### readAsset(asset, options?)
 
-Ingests text, an asset reference, an inline document object, or an array of those inputs.
+Reads the text content of an asset.
 
-Useful options include:
+This is typically used after `query()` or `search()` to retrieve full or partial content for context injection.
 
-- `wait`
-- `embeddingProfile`
-- `chunkSize`
-- `chunkOverlap`
-- `tags`
-- `type`
-- `sourceMessageId`
-- `indexing`
+**asset:** `Attachment | string`
+
+An attachment object or asset id.
+
+**options:** `ReadAssetOptions`
 
 ```ts
-await ctx.memory.ingest("Project roadmap for 2025", {
-  tags: ["roadmap"],
-  type: "text.note"
+interface ReadAssetOptions {
+
+  /**
+   * Maximum number of characters to return.
+   *
+   * Default: undefined
+   */
+  maxChars?: number
+}
+```
+
+**Return:** `Promise<string>`
+
+Example:
+
+```ts
+const content = await ctx.memory.readAsset('asset_123', {
+  maxChars: 20000
 })
 ```
 
-## readAsset(asset, maxChars?)
+---
 
-Reads the text content of a stored asset.
+### removeMemory(memoryId)
 
-```ts
-const content = await ctx.memory.readAsset("asset_123", 20000)
-```
+Deletes a specific memory record.
 
-## retireBySourceMessage(messageId)
+**memoryId:** `string`
 
-Retires memory associated with a source message.
+**Return:** `Promise<{ deleted: boolean }>`
 
-```ts
-await ctx.memory.retireBySourceMessage("msg_123")
-```
-
-## retireMemory(memoryId)
-
-Retires a specific memory record.
+Example:
 
 ```ts
-await ctx.memory.retireMemory("memory_123")
+await ctx.memory.removeMemory('memory_123')
 ```
 
 ## Usage
 
-Example: load pinned memory into the prompt.
+Example: load memory items and inject their contents into the prompt.
 
 ```ts
 export async function onContextBuild(ctx) {
   const items = await ctx.memory.query({
-    sources: ["pinned"],
-    orderBy: "updatedAt",
-    order: "desc",
+    tags: ['pinned'],
     limit: 10
   })
 
   const blocks: string[] = []
 
   for (const item of items) {
-    const content = await ctx.memory.readAsset(item.id, 5000)
+    const content = await ctx.memory.readAsset(item.id, { maxChars: 5000 })
     if (content) {
       blocks.push(content)
     }
   }
 
   if (blocks.length) {
-    ctx.slots.add("memory", blocks.join("\n\n"), {
+    ctx.slots.add('memory', blocks.join('\n\n'), {
       priority: 2,
       position: 1
     })
   }
 
-  ctx.slots.add("input", ctx.input, {
+  ctx.slots.add('input', ctx.input, {
     priority: 1,
     position: 2
   })
@@ -163,12 +290,23 @@ export async function onContextBuild(ctx) {
 }
 ```
 
+Example: ingest a generated summary.
+
+```ts
+await ctx.memory.ingest(summaryText, {
+  tags: ['summary']
+})
+```
+
 ## Notes
 
-- `query()` is for structured listing and filtering.
-- `search()` is for semantic retrieval.
-- `readAsset()` loads stored content.
-- `retire*()` removes memory from active use without exposing storage internals to strategies.
+`ctx.memory` is strategy-facing. Strategies do not manage chunking, embedding, or storage internals.
+
+- `query()` → structured filtering (list)
+- `search()` → semantic retrieval (RAG)
+- `readAsset()` → load full content
+
+Memory should not be relied on as a single source of truth.
 
 #
 #
