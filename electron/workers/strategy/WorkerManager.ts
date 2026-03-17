@@ -15,7 +15,7 @@ import type {
     ToolDefinition,
     RunResult,
     MemoryQueryOptions,
-    UIMemoryCloudItem,
+    MemoryRecord,
     StrategyDevEvent,
 } from '../../../contracts'
 
@@ -44,8 +44,7 @@ type HostRequest =
     | { kind: 'hostRequest'; id: string; method: 'executeMemoryDeleteAsset'; payload: { conversationId: string; assetId: string } }
     | { kind: 'hostRequest'; id: string; method: 'ingestDocument'; payload: MemoryIngestRequest }
     | { kind: 'hostRequest'; id: string; method: 'memoryQuery'; payload: { conversationId: string; options?: MemoryQueryOptions } }
-    | { kind: 'hostRequest'; id: string; method: 'memoryRetireBySourceMessage'; payload: { conversationId: string; messageId: string } }
-    | { kind: 'hostRequest'; id: string; method: 'memoryRetireMemory'; payload: { conversationId: string; memoryId: string } }
+    | { kind: 'hostRequest'; id: string; method: 'memoryRemoveMemory'; payload: { conversationId: string; memoryId: string } }
     | { kind: 'hostRequest'; id: string; method: 'stateGet'; payload: { conversationId: string; strategyId: string; key: string } }
     | { kind: 'hostRequest'; id: string; method: 'stateSet'; payload: { conversationId: string; strategyId: string; key: string; value: unknown } }
     | { kind: 'hostRequest'; id: string; method: 'stateDelete'; payload: { conversationId: string; strategyId: string; key: string } }
@@ -91,9 +90,8 @@ export type HostHandlers = {
     executeMemoryReadAsset?: (args: { conversationId: string; assetId: string; maxChars?: number }) => Promise<string>
     executeMemoryDeleteAsset?: (args: { conversationId: string; assetId: string }) => Promise<{ ok: true }>
     ingestDocument?: (args: MemoryIngestRequest) => Promise<MemoryIngestResult>
-    memoryQuery?: (args: { conversationId: string; options?: MemoryQueryOptions }) => Promise<UIMemoryCloudItem[]>
-    memoryRetireBySourceMessage?: (args: { conversationId: string; messageId: string }) => Promise<{ retired: number }>
-    memoryRetireMemory?: (args: { conversationId: string; memoryId: string }) => Promise<{ retired: boolean }>
+    memoryQuery?: (args: { conversationId: string; options?: MemoryQueryOptions }) => Promise<MemoryRecord[]>
+    memoryRemoveMemory?: (args: { conversationId: string; memoryId: string }) => Promise<{ deleted: boolean }>
     stateGet?: (args: { conversationId: string; strategyId: string; key: string }) => Promise<unknown>
     stateSet?: (args: { conversationId: string; strategyId: string; key: string; value: unknown }) => Promise<{ ok: true }>
     stateDelete?: (args: { conversationId: string; strategyId: string; key: string }) => Promise<{ ok: true }>
@@ -366,20 +364,11 @@ export class WorkerManager {
                 handle.worker.postMessage(res)
                 return
             }
-            if (req.method === 'memoryRetireBySourceMessage') {
-                if (!this.hostHandlers.memoryRetireBySourceMessage) {
-                    throw new Error('memoryRetireBySourceMessage not supported')
+            if (req.method === 'memoryRemoveMemory') {
+                if (!this.hostHandlers.memoryRemoveMemory) {
+                    throw new Error('memoryRemoveMemory not supported')
                 }
-                const result = await this.hostHandlers.memoryRetireBySourceMessage(req.payload)
-                const res: HostResponse = { kind: 'hostResponse', id: req.id, ok: true, result }
-                handle.worker.postMessage(res)
-                return
-            }
-            if (req.method === 'memoryRetireMemory') {
-                if (!this.hostHandlers.memoryRetireMemory) {
-                    throw new Error('memoryRetireMemory not supported')
-                }
-                const result = await this.hostHandlers.memoryRetireMemory(req.payload)
+                const result = await this.hostHandlers.memoryRemoveMemory(req.payload)
                 const res: HostResponse = { kind: 'hostResponse', id: req.id, ok: true, result }
                 handle.worker.postMessage(res)
                 return

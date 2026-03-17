@@ -1,0 +1,84 @@
+---
+title: ctx.state
+description: ctx.state provides persistent key-value storage for the current strategy.
+---
+
+#
+
+## Shape
+
+```ts
+interface StateTools {
+  get<T = unknown>(key: string): Promise<T | null>
+  set(key: string, value: unknown): Promise<void>
+  delete(key: string): Promise<void>
+  has(key: string): Promise<boolean>
+}
+```
+
+## Overview
+
+`ctx.state` is persistent key-value storage for a strategy.
+
+It is useful for conversation-scoped strategy data such as:
+
+- progress markers
+- intermediate summaries
+- cached calculations
+- small workflow state
+
+Values are persisted by the runtime and restored across turns for the same conversation and strategy.
+
+## Methods
+
+### get(key)
+
+Returns the stored value for `key`, or `null` if no value exists.
+
+```ts
+const step = await ctx.state.get<number>("step")
+```
+
+### set(key, value)
+
+Stores a JSON-serializable value under `key`.
+
+```ts
+await ctx.state.set("step", 3)
+```
+
+### delete(key)
+
+Removes a key from the state store.
+
+```ts
+await ctx.state.delete("step")
+```
+
+### has(key)
+
+Checks whether a key exists.
+
+```ts
+if (await ctx.state.has("summary")) {
+  const summary = await ctx.state.get("summary")
+}
+```
+
+## Usage
+
+```ts
+export async function onTurnEnd(ctx) {
+  const step = (await ctx.state.get<number>("step")) ?? 0
+  await ctx.state.set("step", step + 1)
+}
+```
+
+## Notes
+
+- Keep values JSON-serializable.
+- Use `ctx.state` for small persistent strategy data, not large documents.
+- The underlying storage implementation is host-managed.
+
+#
+#

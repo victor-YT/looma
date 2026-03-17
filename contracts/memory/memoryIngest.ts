@@ -1,12 +1,10 @@
 export type MemoryIngestOptions = {
     wait?: 'load' | 'full'
-    embeddingProfile?: string
+    mode?: 'raw' | 'chunk' | 'rag'
     chunkSize?: number
     chunkOverlap?: number
     tags?: string[]
     type?: string
-    sourceMessageId?: string
-    indexing?: 'full' | 'chunkOnly' | 'rawOnly'
 }
 
 export type MemoryIngestRequest = {
@@ -19,6 +17,11 @@ export type MemoryIngestRequest = {
     data?: Uint8Array
     text?: string
     options?: MemoryIngestOptions
+    source?: {
+        conversationId?: string
+        turnId?: string
+        messageId?: string
+    }
 }
 
 export type MemoryIngestResult = {

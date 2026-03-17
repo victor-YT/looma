@@ -24,7 +24,7 @@ export async function searchChunks(
             throw new Error('[memoryStore] search scope must match conversationId')
         }
     }
-    const profile = resolveEmbeddingProfile(args.request.embeddingProfile)
+    const profile = resolveEmbeddingProfile(undefined)
     if (!query) {
         return { embeddingProfile: profile.name, chunks: [] }
     }

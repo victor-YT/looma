@@ -18,6 +18,18 @@ import type {
 } from '../../../contracts/index'
 
 type ProgressFn = (p: MemoryIngestProgress) => void
+type LegacyIngestOptions = MemoryIngestRequest['options'] & { indexing?: 'full' | 'chunkOnly' | 'rawOnly' }
+
+function resolveIngestMode(
+    options: LegacyIngestOptions,
+): 'raw' | 'chunk' | 'rag' {
+    const mode = options?.mode
+    if (mode === 'raw' || mode === 'chunk' || mode === 'rag') return mode
+    const legacyIndexing = (options as LegacyIngestOptions | undefined)?.indexing
+    if (legacyIndexing === 'rawOnly') return 'raw'
+    if (legacyIndexing === 'chunkOnly') return 'chunk'
+    return 'rag'
+}
 
 function toAssetStorageKey(row: { storage_backend?: string | null; uri?: string | null } | null | undefined): string | undefined {
     if (!row) return undefined
@@ -96,7 +108,8 @@ export async function ingestDocument(
                 : options.wait
                     ? 'full'
                     : 'load'
-    const profile = resolveEmbeddingProfile(options.embeddingProfile)
+    const mode = resolveIngestMode(options)
+    const profile = resolveEmbeddingProfile(undefined)
     const assetId = `asset_${crypto.randomUUID()}`
     const strategyId = resolveStrategyId(db, input.conversationId)
     const filename = input.filename || (input.text ? 'ingest.txt' : 'document')
@@ -203,12 +216,9 @@ export async function ingestDocument(
             })
         }
         const mediaModality = resolveMediaModality(mimeType, filename)
-        const requestedIndexing = options.indexing
-        const defaultIndexing = mediaModality ? 'rawOnly' : 'full'
-        const effectiveIndexing = requestedIndexing ?? defaultIndexing
-        const indexing = mediaModality && effectiveIndexing !== 'rawOnly'
-            ? 'rawOnly'
-            : effectiveIndexing
+        const indexing = mediaModality
+            ? 'raw'
+            : mode
         const routedModality: Modality = mediaModality ?? (hasData ? 'file' : 'text')
         const ingestType = options.type ?? (mediaModality ? 'asset.raw' : 'doc.source')
         console.debug(tagIngest, 'modality route', {
@@ -223,7 +233,7 @@ export async function ingestDocument(
             modality: routedModality,
         })
 
-        if (indexing === 'rawOnly') {
+        if (indexing === 'raw') {
             const hasFile = hasData
             let filePath = ''
             if (hasFile) {
@@ -247,16 +257,14 @@ export async function ingestDocument(
                     mime: mimeType,
                     sha256: assetSha256,
                     ingest_status: 'completed',
-                    indexing: 'rawOnly',
+                    mode: 'raw',
                     reason: 'index_disabled',
                     loader_id: loadedPreview?.loaderId ?? null,
                     loader_kind: loadedPreview?.kind ?? null,
                     loader_text_chars: loadedPreview?.textLength ?? 0,
                     loader_text_preview: loadedPreview?.text.slice(0, 200) ?? '',
                 },
-                source: options.sourceMessageId
-                    ? { conversationId: input.conversationId, messageId: options.sourceMessageId }
-                    : undefined,
+                source: input.source,
             })
 
             const storageBackend = hasFile ? 'file' : 'local'
@@ -282,7 +290,7 @@ export async function ingestDocument(
                         sha256: assetSha256,
                         storage_key: storageUri,
                         ingest_status: 'completed',
-                        indexing: 'rawOnly',
+                        mode: 'raw',
                         reason: 'index_disabled',
                         loader_id: loadedPreview?.loaderId ?? null,
                         loader_kind: loadedPreview?.kind ?? null,
@@ -321,13 +329,13 @@ export async function ingestDocument(
             console.debug(tagAsset, 'create', {
                 ...logBase,
                 sizeBytes: sourceBytes.length,
-                indexing: 'rawOnly',
+                mode: 'raw',
             })
             console.debug(tagIndex, 'skip', {
                 ...logBase,
                 sizeBytes: sourceBytes.length,
                 reason: 'index_disabled',
-                indexing: 'rawOnly',
+                mode: 'raw',
             })
 
             emit({ phase: 'loaded', done: 1, total: 1, status: 'completed' })
@@ -388,16 +396,14 @@ export async function ingestDocument(
                 mime: mimeType,
                 sha256: assetSha256,
                 ingest_status: 'ingesting',
-                embedding_profile: profile.name,
-                indexing,
+                embedding_profile: indexing === 'rag' ? profile.name : null,
+                mode: indexing,
                 loader_id: loadedPreview?.loaderId ?? null,
                 loader_kind: loadedPreview?.kind ?? null,
                 loader_text_chars: loadedPreview?.textLength ?? 0,
                 loader_text_preview: loadedPreview?.text.slice(0, 200) ?? '',
             },
-            source: options.sourceMessageId
-                ? { conversationId: input.conversationId, messageId: options.sourceMessageId }
-                : undefined,
+            source: input.source,
         })
 
         const storageBackend = hasFile ? 'file' : 'local'
@@ -423,7 +429,8 @@ export async function ingestDocument(
                     sha256: assetSha256,
                     storage_key: storageUri,
                     ingest_status: 'ingesting',
-                    embedding_profile: profile.name,
+                    embedding_profile: indexing === 'rag' ? profile.name : null,
+                    mode: indexing,
                     loader_id: loadedPreview?.loaderId ?? null,
                     loader_kind: loadedPreview?.kind ?? null,
                     loader_text_chars: loadedPreview?.textLength ?? 0,
@@ -461,7 +468,7 @@ export async function ingestDocument(
         console.debug(tagAsset, 'create', {
             ...logBase,
             sizeBytes: sourceBytes.length,
-            indexing: 'full',
+            mode: indexing,
         })
 
         const chunkSize = Math.max(100, options.chunkSize ?? DEFAULT_CHUNK_SIZE)
@@ -476,7 +483,7 @@ export async function ingestDocument(
                     ...logBase,
                     sizeBytes: sourceBytes.length,
                     reason: 'no_text',
-                    indexing: 'full',
+                    mode: indexing,
                 })
             }
             emit({ phase: 'chunk', done: chunks.length, total: chunks.length })
@@ -485,7 +492,7 @@ export async function ingestDocument(
                 throw new Error('no chunks created')
             }
 
-            const vectors = indexing === 'full'
+            const vectors = indexing === 'rag'
                 ? (() => {
                     phase = 'embed'
                     console.debug(tagStore, phase, { ...logBase, chunkCount: chunks.length })
@@ -500,7 +507,7 @@ export async function ingestDocument(
                         ...logBase,
                         sizeBytes: sourceBytes.length,
                         reason: 'index_disabled',
-                        indexing,
+                        mode: indexing,
                     })
                     return Promise.resolve([] as Float32Array[])
                 })()
@@ -538,7 +545,7 @@ export async function ingestDocument(
                     `).get(assetId, hash, input.conversationId, scope.strategyKey, scope.strategyVersion) as { id: string } | undefined
                     const finalChunkId = row?.id ?? chunkId
 
-                    if (indexing === 'full') {
+                    if (indexing === 'rag') {
                         const vec = resolvedVectors[i]
                         if (!vec) continue
                         const vecBuf = Buffer.from(new Uint8Array(vec.buffer, vec.byteOffset, vec.byteLength))
@@ -567,8 +574,8 @@ export async function ingestDocument(
             updateAssetMeta({
                 ingest_status: 'completed',
                 chunk_count: chunks.length,
-                embedding_profile: indexing === 'full' ? profile.name : null,
-                indexing,
+                embedding_profile: indexing === 'rag' ? profile.name : null,
+                mode: indexing,
             })
 
             phase = 'completed'

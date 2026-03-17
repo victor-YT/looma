@@ -94,7 +94,6 @@ export function registerMemoryCloudIPC() {
                 options: {
                     ...(payload.options ?? {}),
                     type: payload.options?.type ?? 'memory_cloud.document',
-                    embeddingProfile: undefined,
                 },
                 onProgress: (p) => {
                     event.sender.send(IPC.MEMORY_INGEST_PROGRESS, p)

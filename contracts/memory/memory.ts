@@ -3,6 +3,23 @@ export type ScopeType = 'global' | 'project' | 'conversation'
 export type Modality  = 'text' | 'image' | 'audio' | 'video' | 'file'
 export type VecModality = 'text' | 'image' | 'audio' | 'video'
 
+export type MemoryRecord = {
+    id: string
+    assetId?: string
+    type: string
+    modality: Modality
+    title?: string
+    preview?: string
+    tags: string[]
+    pinned: boolean
+    createdAt: number
+    updatedAt: number
+}
+
+export type ReadAssetOptions = {
+    maxChars?: number
+}
+
 export interface MemoryItemInput {
     id?: string
     strategy_id: string
@@ -34,7 +51,6 @@ export interface MemoryItemInput {
     content_hash?: string
 
     priority?: number
-    ttl_at?: number
 
     /** Legacy compatibility: if write-and-embed is needed, let the caller trigger embedMemory afterwards. */
     embed?: {

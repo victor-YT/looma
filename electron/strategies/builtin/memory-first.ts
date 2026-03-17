@@ -14,7 +14,7 @@ export async function onContextBuild(ctx: LoomaContext): Promise<StrategyContext
     const history = ctx.history.recent(10) || []
 
     const items = await ctx.memory.query({
-        sources: ['pinned'],
+        pinned: true,
         orderBy: 'updatedAt',
         order: 'desc',
         limit: 200,
@@ -23,8 +23,9 @@ export async function onContextBuild(ctx: LoomaContext): Promise<StrategyContext
     const blocks: string[] = []
 
     for (const item of items) {
+        if (!item.assetId) continue
         try {
-            const content = await ctx.memory.readAsset(item.id, 20000)
+            const content = await ctx.memory.readAsset(item.assetId, { maxChars: 20000 })
             if (content) {
                 blocks.push(`### ${item.title || item.type}\n${content}`)
             }

@@ -1,0 +1,174 @@
+---
+title: ctx.memory
+description: ctx.memory provides ingestion, retrieval, asset reads, and retirement operations for strategy memory.
+---
+
+#
+
+## Shape
+
+```ts
+interface MemoryAPI {
+  query(options?: MemoryQueryOptions): Promise<UIMemoryCloudItem[]>
+  search(query: string, options?: MemorySearchOptions): Promise<MemoryHit[]>
+  ingest(
+    input: MemoryIngestInput,
+    options?: MemoryIngestOptions
+  ): Promise<MemoryIngestResult | MemoryIngestResult[]>
+  readAsset(asset: Attachment | string, maxChars?: number): Promise<string>
+  retireBySourceMessage(messageId: string): Promise<{ retired: number }>
+  retireMemory(memoryId: string): Promise<{ retired: boolean }>
+}
+```
+
+## Overview
+
+`ctx.memory` is the strategy-facing memory API.
+
+It lets strategies:
+
+- ingest new text or assets
+- list memory records
+- run semantic retrieval
+- read stored asset content back into context
+- retire memory created from a message or a specific record
+
+The runtime handles storage, parsing, chunking, and indexing.
+
+## query(options?)
+
+Lists memory records for the current conversation.
+
+Common filters include:
+
+- `tags`
+- `types`
+- `sources`
+- `ttl`
+- `status`
+- `limit`
+- `offset`
+
+Example:
+
+```ts
+const items = await ctx.memory.query({
+  sources: ["pinned"],
+  orderBy: "updatedAt",
+  order: "desc",
+  limit: 20
+})
+```
+
+## search(query, options?)
+
+Runs semantic retrieval over indexed memory content.
+
+Common options include:
+
+- `topK`
+- `embeddingProfile`
+- `threshold`
+- `tags`
+- `types`
+- `sources`
+
+```ts
+const hits = await ctx.memory.search("project roadmap", {
+  topK: 5
+})
+```
+
+## ingest(input, options?)
+
+Ingests text, an asset reference, an inline document object, or an array of those inputs.
+
+Useful options include:
+
+- `wait`
+- `embeddingProfile`
+- `chunkSize`
+- `chunkOverlap`
+- `tags`
+- `type`
+- `sourceMessageId`
+- `indexing`
+
+```ts
+await ctx.memory.ingest("Project roadmap for 2025", {
+  tags: ["roadmap"],
+  type: "text.note"
+})
+```
+
+## readAsset(asset, maxChars?)
+
+Reads the text content of a stored asset.
+
+```ts
+const content = await ctx.memory.readAsset("asset_123", 20000)
+```
+
+## retireBySourceMessage(messageId)
+
+Retires memory associated with a source message.
+
+```ts
+await ctx.memory.retireBySourceMessage("msg_123")
+```
+
+## retireMemory(memoryId)
+
+Retires a specific memory record.
+
+```ts
+await ctx.memory.retireMemory("memory_123")
+```
+
+## Usage
+
+Example: load pinned memory into the prompt.
+
+```ts
+export async function onContextBuild(ctx) {
+  const items = await ctx.memory.query({
+    sources: ["pinned"],
+    orderBy: "updatedAt",
+    order: "desc",
+    limit: 10
+  })
+
+  const blocks: string[] = []
+
+  for (const item of items) {
+    const content = await ctx.memory.readAsset(item.id, 5000)
+    if (content) {
+      blocks.push(content)
+    }
+  }
+
+  if (blocks.length) {
+    ctx.slots.add("memory", blocks.join("\n\n"), {
+      priority: 2,
+      position: 1
+    })
+  }
+
+  ctx.slots.add("input", ctx.input, {
+    priority: 1,
+    position: 2
+  })
+
+  return ctx.slots.render()
+}
+```
+
+## Notes
+
+- `query()` is for structured listing and filtering.
+- `search()` is for semantic retrieval.
+- `readAsset()` loads stored content.
+- `retire*()` removes memory from active use without exposing storage internals to strategies.
+
+#
+#

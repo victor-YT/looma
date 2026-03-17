@@ -6,7 +6,7 @@ import type { UIMessage } from '../ui/UIMessage'
 import type { Role } from '../shared'
 import type { MemoryHit } from '../memory/memorySearch'
 import type { MemoryIngestOptions, MemoryIngestResult } from '../memory/memoryIngest'
-import type { UIMemoryCloudItem } from '../ui/UIMemoryCloud'
+import type { MemoryRecord, ReadAssetOptions } from '../memory/memory'
 import type { StrategyManifest } from '../settings'
 
 /**
@@ -226,23 +226,17 @@ export type ToolChoice =
 export type MemoryQueryOptions = {
     tags?: string[]
     types?: string[]
-    sources?: Array<'implicit' | 'pinned' | 'history' | 'asset'>
-    ttl?: 'alive' | 'expired' | 'includeExpired'
-    status?: Array<'active' | 'retired'>
+    pinned?: boolean
+    hasAsset?: boolean
     orderBy?: 'updatedAt' | 'createdAt'
     order?: 'desc' | 'asc'
     limit?: number
     offset?: number
-    includeAssets?: boolean
 }
 
 export type MemorySearchOptions = {
     topK?: number
-    embeddingProfile?: string
     threshold?: number
-    tags?: string[]
-    types?: string[]
-    sources?: Array<'implicit' | 'pinned' | 'history' | 'asset'>
 }
 
 export type MemoryIngestSource =
@@ -279,12 +273,11 @@ export type StateTools = {
 }
 
 export type MemoryAPI = {
-    query(options?: MemoryQueryOptions): Promise<UIMemoryCloudItem[]>
+    query(options?: MemoryQueryOptions): Promise<MemoryRecord[]>
     search(query: string, options?: MemorySearchOptions): Promise<MemoryHit[]>
     ingest(input: MemoryIngestInput, options?: MemoryIngestOptions): Promise<MemoryIngestResult | MemoryIngestResult[]>
-    readAsset(asset: Attachment | string, maxChars?: number): Promise<string>
-    retireBySourceMessage(messageId: string): Promise<{ retired: number }>
-    retireMemory(memoryId: string): Promise<{ retired: boolean }>
+    readAsset(asset: Attachment | string, options?: ReadAssetOptions): Promise<string>
+    removeMemory(memoryId: string): Promise<{ deleted: boolean }>
 }
 
 export type ToolsAPI = {
@@ -600,7 +593,7 @@ export type StrategyDevEvent =
     | (StrategyDevEventBase & {
         type: 'memory'
         data: {
-            action: 'query' | 'search' | 'ingest' | 'readAsset' | 'retireBySourceMessage' | 'retireMemory'
+            action: 'query' | 'search' | 'ingest' | 'readAsset' | 'removeMemory'
             input?: unknown
             output?: unknown
             error?: string

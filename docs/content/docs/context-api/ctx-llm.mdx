@@ -1,0 +1,118 @@
+---
+title: ctx.llm
+description: ctx.llm provides direct access to the active model for internal strategy calls.
+---
+
+#
+
+## Shape
+
+```ts
+interface LLMTools {
+  call(input: string | Message[]): Promise<Message>
+  call(
+    messages: LLMMessage[],
+    options?: {
+      tools?: ToolDefinition[]
+      toolChoice?: ToolChoice
+      temperature?: number
+    }
+  ): Promise<LLMMessage>
+  run(options: {
+    messages: LLMMessage[]
+    tools?: ToolDefinition[]
+    toolChoice?: ToolChoice
+    maxRounds?: number
+    temperature?: number
+  }): Promise<RunResult>
+}
+```
+
+## Overview
+
+`ctx.llm` lets a strategy call the currently selected model directly.
+
+This is usually for internal strategy work such as:
+
+- summarizing history
+- rewriting prompts
+- classifying intent
+- extracting structured information
+- running a short host-managed tool loop
+
+The model configuration comes from the user's active model settings.
+These calls do not automatically modify conversation history or the prompt being built through `ctx.slots`.
+
+## call(input, options?)
+
+`call()` performs a single model invocation and returns the assistant message.
+
+If you pass a string, it is treated as one user message.
+If you pass a message array, the messages are sent as-is.
+
+Simple example:
+
+```ts
+const summary = await ctx.llm.call("Summarize the following text...")
+```
+
+Message-array example:
+
+```ts
+const summary = await ctx.llm.call([
+  { role: "system", content: "Summarize the following conversation." },
+  { role: "user", content: JSON.stringify(ctx.history.recent(20)) }
+])
+```
+
+When you use the `LLMMessage[]` overload, you may also provide `tools`, `toolChoice`, and `temperature`.
+
+## run(options)
+
+`run()` executes a host-managed multi-round model loop.
+
+Use it when the model may need to call tools across multiple rounds before producing a final answer.
+
+```ts
+const result = await ctx.llm.run({
+  messages: [
+    { role: "system", content: "Answer carefully." },
+    { role: "user", content: ctx.input.text }
+  ],
+  tools,
+  toolChoice: "auto",
+  maxRounds: 4
+})
+```
+
+## Usage
+
+Example: summarize recent history and store it in strategy state.
+
+```ts
+export async function onTurnEnd(ctx) {
+  const recent = ctx.history.recent(20)
+
+  const summary = await ctx.llm.call([
+    {
+      role: "system",
+      content: "Summarize the following conversation."
+    },
+    {
+      role: "user",
+      content: JSON.stringify(recent)
+    }
+  ])
+
+  await ctx.state.set("history_summary", summary.content)
+}
+```
+
+## Notes
+
+- `ctx.llm.call()` is for one direct model call.
+- `ctx.llm.run()` is for host-managed multi-round execution.
+- Neither method automatically writes to history, memory, or slots.
+
+#
+#

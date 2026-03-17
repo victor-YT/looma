@@ -47,7 +47,7 @@ export async function runMemorySmoke(db: Database): Promise<void> {
 
     const hitsA = await searchChunks(db, {
         conversationId: convA,
-        request: { query: textA, topK: 4, embeddingProfile: 'default' },
+        request: { query: textA, topK: 4 },
     })
     if (hitsA.chunks.length === 0) {
         throw new Error('[memorySmoke] expected hits in conversation A')
@@ -55,7 +55,7 @@ export async function runMemorySmoke(db: Database): Promise<void> {
 
     const hitsB = await searchChunks(db, {
         conversationId: convB,
-        request: { query: textA, topK: 4, embeddingProfile: 'default' },
+        request: { query: textA, topK: 4 },
     })
     if (hitsB.chunks.length !== 0) {
         console.error('[memorySmoke] cross-conversation hits', hitsB)
@@ -66,7 +66,7 @@ export async function runMemorySmoke(db: Database): Promise<void> {
 
     const hitsAfterDelete = await searchChunks(db, {
         conversationId: convA,
-        request: { query: textA, topK: 4, embeddingProfile: 'default' },
+        request: { query: textA, topK: 4 },
     })
     if (hitsAfterDelete.chunks.length !== 0) {
         throw new Error('[memorySmoke] expected zero hits after deleteAsset')

@@ -9,7 +9,9 @@
     "ctx-budget",
     "ctx-capabilities",
     "ctx-slots",
-    "ctx-tools",
+    "ctx-llm",
+    "ctx-state",
+    "ctx-memory",
     "ctx-utils"
   ]
 }

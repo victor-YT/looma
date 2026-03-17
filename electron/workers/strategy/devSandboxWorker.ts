@@ -85,8 +85,7 @@ function createMockCtx() {
         search: async () => [],
         ingest: async () => ({ assetId: '', chunkCount: 0, status: 'completed' as const }),
         readAsset: async () => '',
-        retireBySourceMessage: async () => ({ retired: 0 }),
-        retireMemory: async () => ({ retired: false }),
+        removeMemory: async () => ({ deleted: false }),
     }
     const tools = {
         llm,

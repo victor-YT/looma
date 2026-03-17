@@ -57,7 +57,7 @@ const files = ctx.input.attachments
 ## Notes
 
 ctx.input is read-only from the strategy point of view.
-If a strategy wants to ingest new material into memory, that happens through ctx.tools.memory.ingest(...), not by mutating ctx.input.
+If a strategy wants to ingest new material into memory, that happens through `ctx.memory.ingest(...)`, not by mutating `ctx.input`.
 
 #
 #

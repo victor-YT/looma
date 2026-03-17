@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import type { Database } from 'better-sqlite3'
 import type {
     MemoryHit,
@@ -16,7 +17,7 @@ type StrategyMemorySearchInput = {
     query: string
     options?: {
         topK?: number
-        embeddingProfile?: string
+        threshold?: number
     }
 }
 
@@ -33,6 +34,11 @@ function errorToLog(err: unknown): string {
     return String(err)
 }
 
+function normalizeThreshold(value: number | undefined): number | undefined {
+    if (!Number.isFinite(value)) return undefined
+    return Math.min(1, Math.max(0, value as number))
+}
+
 async function assertMemoryCloudEnabled(db: Database, conversationId: string): Promise<StrategyRecord> {
     if (!conversationId) throw new Error('conversationId required')
     const conversation = db.prepare(`SELECT id, strategy_id FROM conversations WHERE id = ?`)
@@ -46,14 +52,6 @@ async function assertMemoryCloudEnabled(db: Database, conversationId: string): P
     const enabled = await resolveStrategyMemoryCloudFeature(resolved.strategy)
     if (!enabled) throw new Error('MEMORY_CLOUD_DISABLED')
     return resolved.strategy
-}
-
-function stripEmbeddingOverride<T extends { embeddingProfile?: string }>(options?: T): T | undefined {
-    if (!options) return options
-    if (typeof options.embeddingProfile !== 'string' || options.embeddingProfile.trim().length <= 0) return options
-    const next = { ...options }
-    delete (next as { embeddingProfile?: string }).embeddingProfile
-    return next
 }
 
 function toSimilarity(score: number, metric: 'cosine' | 'l2' | 'dot'): number {
@@ -74,26 +72,17 @@ export async function strategyMemorySearch(
 ): Promise<MemoryHit[]> {
     const t0 = Date.now()
     const strategy = await assertMemoryCloudEnabled(db, args.conversationId)
-    if (typeof args.options?.embeddingProfile === 'string' && args.options.embeddingProfile.trim().length > 0) {
-        log('warn', '[MEMORY][embedding_profile_ignored]', {
-            conversationId: args.conversationId,
-            strategyId: strategy.id,
-            requested: args.options.embeddingProfile,
-            reason: 'single_embedding_space',
-        })
-    }
-    const options = stripEmbeddingOverride(args.options)
+    const threshold = normalizeThreshold(args.options?.threshold)
     log('info', '[MEMORY_CLOUD][strategy_search_start]', {
         conversationId: args.conversationId,
         strategyId: strategy.id,
         queryLength: args.query?.length ?? 0,
-        topK: options?.topK ?? null,
+        topK: args.options?.topK ?? null,
     })
     try {
         const request = {
             query: args.query,
-            topK: options?.topK,
-            embeddingProfile: undefined,
+            topK: args.options?.topK,
             scope: { type: 'conversation' as const, id: args.conversationId },
         }
         const result = await searchChunks(db, {
@@ -101,18 +90,20 @@ export async function strategyMemorySearch(
             request,
         })
         const profile = resolveEmbeddingProfile(undefined)
-        const hits = result.chunks.map((chunk) => ({
-            id: chunk.chunkId,
-            type: 'chunk' as const,
-            content: chunk.text,
-            similarity: toSimilarity(chunk.score, profile.metric),
-            assetId: chunk.assetId,
-            chunkId: chunk.chunkId,
-            source: {
-                strategyId: strategy.id,
-                conversationId: args.conversationId,
-            },
-        }))
+        const hits = result.chunks
+            .map((chunk) => ({
+                id: chunk.chunkId,
+                type: 'chunk' as const,
+                content: chunk.text,
+                similarity: toSimilarity(chunk.score, profile.metric),
+                assetId: chunk.assetId,
+                chunkId: chunk.chunkId,
+                source: {
+                    strategyId: strategy.id,
+                    conversationId: args.conversationId,
+                },
+            }))
+            .filter((hit) => threshold == null || hit.similarity >= threshold)
         log('info', '[MEMORY_CLOUD][strategy_search_done]', {
             conversationId: args.conversationId,
             strategyId: strategy.id,
@@ -169,22 +160,83 @@ export async function strategyMemoryReadAsset(
     }
 }
 
+function buildAssetIngestInput(
+    db: Database,
+    args: StrategyMemoryIngestInput,
+): StrategyMemoryIngestInput {
+    const assetId = args.assetId?.trim()
+    if (!assetId) {
+        throw new Error('MEMORY_ASSET_NOT_FOUND')
+    }
+    const row = db.prepare(`
+        SELECT
+            a.id,
+            a.filename,
+            a.uri,
+            a.storage_backend,
+            a.mime_type,
+            ab.bytes
+        FROM memory_assets a
+        LEFT JOIN asset_blobs ab ON ab.id = a.blob_id
+        WHERE a.id = ?
+          AND a.conversation_id = ?
+        LIMIT 1
+    `).get(assetId, args.conversationId) as {
+        id: string
+        filename?: string | null
+        uri?: string | null
+        storage_backend: string
+        mime_type?: string | null
+        bytes?: Buffer | null
+    } | undefined
+    if (!row) {
+        throw new Error('MEMORY_ASSET_NOT_FOUND')
+    }
+
+    let data: Uint8Array | undefined
+    if (row.bytes && row.bytes.byteLength > 0) {
+        data = new Uint8Array(row.bytes)
+    } else if (row.storage_backend === 'file' && typeof row.uri === 'string' && row.uri.trim()) {
+        data = new Uint8Array(fs.readFileSync(row.uri))
+    }
+
+    if (data && data.byteLength > 0) {
+        return {
+            ...args,
+            assetId: undefined,
+            filename: row.filename ?? assetId,
+            mime: row.mime_type ?? args.mime,
+            data,
+            text: undefined,
+        }
+    }
+
+    const detail = readAsset(db, {
+        conversationId: args.conversationId,
+        assetId,
+    })
+    const text = detail?.text?.trim()
+    if (!text) {
+        throw new Error('MEMORY_ASSET_NOT_READABLE')
+    }
+
+    return {
+        ...args,
+        assetId: undefined,
+        filename: row.filename ?? `${assetId}.txt`,
+        mime: row.mime_type ?? 'text/plain',
+        data: undefined,
+        text,
+    }
+}
+
 export async function strategyMemoryIngest(
     db: Database,
     args: StrategyMemoryIngestInput,
 ): Promise<MemoryIngestResult> {
     const t0 = Date.now()
     const strategy = await assertMemoryCloudEnabled(db, args.conversationId)
-    if (typeof args.options?.embeddingProfile === 'string' && args.options.embeddingProfile.trim().length > 0) {
-        log('warn', '[MEMORY][embedding_profile_ignored]', {
-            conversationId: args.conversationId,
-            strategyId: strategy.id,
-            requested: args.options.embeddingProfile,
-            reason: 'single_embedding_space',
-        })
-    }
-    const options = stripEmbeddingOverride(args.options) ?? {}
-    const wait = options.wait ?? 'load'
+    const wait = args.options?.wait ?? 'load'
     const inputKind = args.assetId
         ? 'asset'
         : args.text
@@ -192,13 +244,6 @@ export async function strategyMemoryIngest(
             : args.data
                 ? 'bytes'
                 : 'unknown'
-    const ingestArgs: StrategyMemoryIngestInput = {
-        ...args,
-        options: {
-            ...options,
-            embeddingProfile: undefined,
-        },
-    }
     log('info', '[MEMORY_CLOUD][strategy_ingest_start]', {
         conversationId: args.conversationId,
         strategyId: strategy.id,
@@ -207,33 +252,7 @@ export async function strategyMemoryIngest(
         assetId: args.assetId ?? null,
     })
     try {
-        if (ingestArgs.assetId) {
-            const detail = readAsset(db, {
-                conversationId: ingestArgs.conversationId,
-                assetId: ingestArgs.assetId,
-            })
-            if (!detail) {
-                throw new Error('MEMORY_ASSET_NOT_FOUND')
-            }
-            const status = wait === 'load' ? 'loaded' : 'completed'
-            const result: MemoryIngestResult = {
-                assetId: ingestArgs.assetId,
-                chunkCount: detail.chunkCount ?? 0,
-                status,
-            }
-            log('info', status === 'loaded'
-                ? '[MEMORY_CLOUD][strategy_ingest_loaded]'
-                : '[MEMORY_CLOUD][strategy_ingest_completed]', {
-                conversationId: args.conversationId,
-                strategyId: strategy.id,
-                inputKind,
-                wait,
-                assetId: ingestArgs.assetId,
-                elapsedMs: Date.now() - t0,
-            })
-            return result
-        }
-
+        const ingestArgs = args.assetId ? buildAssetIngestInput(db, args) : args
         const result = await ingestDocument(db, ingestArgs)
         const phase = result.status === 'loaded'
             ? '[MEMORY_CLOUD][strategy_ingest_loaded]'

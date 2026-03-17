@@ -1,6 +1,6 @@
 import type { Database } from 'better-sqlite3'
 import crypto from 'node:crypto'
-import type { MemoryAssetRecord, MemoryAssetDetail, Modality, UIMemoryCloudItem } from '../../../contracts/index'
+import type { MemoryAssetRecord, MemoryAssetDetail, MemoryRecord, Modality } from '../../../contracts/index'
 import { assertConversationId, assertStrategyScope, mergeMeta, resolveStrategyScope } from './utils'
 import { ensureAssetBlob } from './assetUpsert'
 
@@ -18,7 +18,6 @@ export type MemoryItemCreateInput = {
     meta?: Record<string, unknown>
     contentHash?: string
     priority?: number
-    ttlAt?: number
     pinned?: boolean
     source?: {
         conversationId?: string
@@ -44,7 +43,7 @@ export function createMemoryItem(db: Database, input: MemoryItemCreateInput): st
             text_repr, text_repr_model,
             content, size_tokens,
             tags, meta, content_hash,
-            priority, ttl_at,
+            priority,
             pinned,
             created_at, updated_at
         ) VALUES (
@@ -56,7 +55,7 @@ export function createMemoryItem(db: Database, input: MemoryItemCreateInput): st
             @text_repr, @text_repr_model,
             @content, @size_tokens,
             @tags, @meta, @content_hash,
-            @priority, @ttl_at,
+            @priority,
             @pinned,
             @created_at, @updated_at
         )
@@ -78,7 +77,6 @@ export function createMemoryItem(db: Database, input: MemoryItemCreateInput): st
         meta: jsonMeta,
         content_hash: input.contentHash ?? null,
         priority: input.priority ?? null,
-        ttl_at: input.ttlAt ?? null,
         pinned: input.pinned ? 1 : 0,
         created_at: now,
         updated_at: now,
@@ -87,51 +85,111 @@ export function createMemoryItem(db: Database, input: MemoryItemCreateInput): st
     return id
 }
 
-export function listMemoryCloud(
+function parseTags(raw: string | null | undefined): string[] {
+    if (!raw) return []
+    try {
+        const parsed = JSON.parse(raw)
+        if (!Array.isArray(parsed)) return []
+        return parsed.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    } catch {
+        return []
+    }
+}
+
+function normalizePreview(value: string | null | undefined, max = 240): string | undefined {
+    if (typeof value !== 'string') return undefined
+    const trimmed = value.trim()
+    if (!trimmed) return undefined
+    return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max)}...`
+}
+
+function matchesAllTags(recordTags: string[], wanted: string[] | undefined): boolean {
+    if (!wanted?.length) return true
+    const tagSet = new Set(recordTags)
+    return wanted.every((tag) => tagSet.has(tag))
+}
+
+export function queryMemoryRecords(
     db: Database,
-    args: { conversationId: string; limit?: number; offset?: number; order?: 'newest' | 'priority' },
-): UIMemoryCloudItem[] {
+    args: {
+        conversationId: string
+        tags?: string[]
+        types?: string[]
+        pinned?: boolean
+        hasAsset?: boolean
+        orderBy?: 'updatedAt' | 'createdAt'
+        order?: 'desc' | 'asc'
+        limit?: number
+        offset?: number
+    },
+): MemoryRecord[] {
     assertConversationId(args.conversationId)
-    const filters = [
-        'pinned = 1',
-        'scope_type = ?',
-        'scope_id = ?',
-    ]
-    const params: Array<string | number> = ['conversation', args.conversationId]
-
-    const orderBy = args.order === 'priority'
-        ? 'ORDER BY priority DESC NULLS LAST, updated_at DESC'
-        : 'ORDER BY updated_at DESC'
-    const limitSQL = typeof args.limit === 'number' ? ' LIMIT ?' : ''
-    const offsetSQL = typeof args.offset === 'number' ? ' OFFSET ?' : ''
-    if (typeof args.limit === 'number') params.push(args.limit)
-    if (typeof args.offset === 'number') params.push(args.offset)
-
     const rows = db.prepare(`
-        SELECT id, type, modality, text_repr, created_at, updated_at, pinned
-        FROM memory_items
-        WHERE ${filters.join(' AND ')}
-        ${orderBy}${limitSQL}${offsetSQL}
-    `).all(...params) as Array<{
+        SELECT
+            m.id,
+            m.type,
+            m.modality,
+            m.text_repr,
+            m.content,
+            m.tags,
+            m.created_at,
+            m.updated_at,
+            m.pinned,
+            (
+                SELECT a.id
+                FROM memory_assets a
+                WHERE a.memory_id = m.id
+                ORDER BY a.created_at ASC
+                LIMIT 1
+            ) AS asset_id
+        FROM memory_items m
+        WHERE m.scope_type = 'conversation'
+          AND m.scope_id = ?
+    `).all(args.conversationId) as Array<{
         id: string
         type: string
         modality: Modality
         text_repr?: string | null
+        content?: string | null
+        tags?: string | null
         created_at: number
         updated_at: number
         pinned: 0 | 1
+        asset_id?: string | null
     }>
 
-    return rows.map(r => ({
-        id: r.id,
-        title: r.text_repr ?? undefined,
-        type: r.type,
-        modality: r.modality,
-        preview: undefined,
-        created_at: r.created_at,
-        updated_at: r.updated_at,
-        pinned: r.pinned,
+    const records = rows.map((row): MemoryRecord => ({
+        id: row.id,
+        assetId: row.asset_id ?? undefined,
+        title: row.text_repr ?? undefined,
+        type: row.type,
+        modality: row.modality,
+        preview: normalizePreview(row.content ?? row.text_repr),
+        tags: parseTags(row.tags),
+        pinned: row.pinned === 1,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
     }))
+
+    const filtered = records.filter((record) => {
+        if (args.types?.length && !args.types.includes(record.type)) return false
+        if (typeof args.pinned === 'boolean' && record.pinned !== args.pinned) return false
+        if (typeof args.hasAsset === 'boolean' && Boolean(record.assetId) !== args.hasAsset) return false
+        return matchesAllTags(record.tags, args.tags)
+    })
+
+    const orderBy = args.orderBy ?? 'updatedAt'
+    const direction = args.order === 'asc' ? 1 : -1
+    filtered.sort((left, right) => {
+        const a = orderBy === 'createdAt' ? left.createdAt : left.updatedAt
+        const b = orderBy === 'createdAt' ? right.createdAt : right.updatedAt
+        if (a !== b) return (a - b) * direction
+        return left.id.localeCompare(right.id) * direction
+    })
+
+    const offset = Math.max(0, args.offset ?? 0)
+    const limit = args.limit == null ? filtered.length : Math.max(0, args.limit)
+    return filtered.slice(offset, offset + limit)
 }
 
 export function updateMemoryItem(
@@ -143,7 +201,6 @@ export function updateMemoryItem(
         tags?: unknown[]
         meta?: Record<string, unknown>
         priority?: number
-        ttlAt?: number
     }
 ): void {
     assertConversationId(args.conversationId)
@@ -154,7 +211,6 @@ export function updateMemoryItem(
             tags = COALESCE(@tags, tags),
             meta = COALESCE(@meta, meta),
             priority = COALESCE(@priority, priority),
-            ttl_at = COALESCE(@ttl_at, ttl_at),
             updated_at = @updated_at
         WHERE id = @id
           AND scope_type = 'conversation'
@@ -166,7 +222,6 @@ export function updateMemoryItem(
         tags: args.tags ? JSON.stringify(args.tags) : null,
         meta: args.meta ? JSON.stringify(args.meta) : null,
         priority: args.priority ?? null,
-        ttl_at: args.ttlAt ?? null,
         updated_at: now,
     })
 }
@@ -189,28 +244,15 @@ export function setMemoryPinned(
 export function deleteMemoryItem(
     db: Database,
     args: { conversationId: string; memoryId: string },
-): void {
+): boolean {
     assertConversationId(args.conversationId)
-    db.prepare(`
+    const result = db.prepare(`
         DELETE FROM memory_items
         WHERE id = ?
           AND scope_type = 'conversation'
           AND scope_id = ?
     `).run(args.memoryId, args.conversationId)
-}
-
-export function retireMemoriesBySourceMessage(
-    db: Database,
-    args: { conversationId: string; messageId: string },
-): number {
-    assertConversationId(args.conversationId)
-    const res = db.prepare(`
-        DELETE FROM memory_items
-        WHERE scope_type = 'conversation'
-          AND scope_id = ?
-          AND source_message_id = ?
-    `).run(args.conversationId, args.messageId)
-    return res.changes ?? 0
+    return (result.changes ?? 0) > 0
 }
 
 export function listAssets(

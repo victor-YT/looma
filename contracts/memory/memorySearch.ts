@@ -4,7 +4,7 @@ export type MemoryChunkSearchRequest = {
     query: string
     scope?: { type: ScopeType; id: string }
     topK?: number
-    embeddingProfile?: string
+    threshold?: number
 }
 
 export type MemoryHit = {
@@ -17,7 +17,6 @@ export type MemoryHit = {
     source?: {
         strategyId?: string
         conversationId?: string
-        sourceMessageId?: string
     }
 }
 

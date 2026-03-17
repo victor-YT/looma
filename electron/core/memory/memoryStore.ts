@@ -1,10 +1,9 @@
 export {
     createMemoryItem,
-    listMemoryCloud,
+    queryMemoryRecords,
     updateMemoryItem,
     setMemoryPinned,
     deleteMemoryItem,
-    retireMemoriesBySourceMessage,
     listAssets,
     deleteAsset,
     readAsset,

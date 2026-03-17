@@ -166,14 +166,12 @@ function summarizeIngestInput(inputData: MemoryIngestInput, options?: MemoryInge
         itemCount: items.length,
         items: items.map(summarizeIngestItem),
         options: {
-            wait: options?.wait ?? 'load',
-            embeddingProfile: options?.embeddingProfile,
+            wait: options?.wait ?? 'full',
+            mode: options?.mode ?? 'rag',
             chunkSize: options?.chunkSize,
             chunkOverlap: options?.chunkOverlap,
             tags: options?.tags,
             type: options?.type,
-            sourceMessageId: options?.sourceMessageId,
-            indexing: options?.indexing,
         },
     }
 }
@@ -319,6 +317,15 @@ export function createMemoryApi(args: ContextToolArgs): MemoryAPI {
         devEmit({ type: 'memory', data })
     }
 
+    const buildIngestOptions = (options?: MemoryIngestOptions): MemoryIngestOptions => ({
+        wait: options?.wait ?? 'full',
+        mode: options?.mode ?? 'rag',
+        chunkSize: options?.chunkSize,
+        chunkOverlap: options?.chunkOverlap,
+        tags: options?.tags,
+        type: options?.type,
+    })
+
     return {
         query: async (options?: MemoryQueryOptions) => {
             const input = { options }
@@ -345,7 +352,7 @@ export function createMemoryApi(args: ContextToolArgs): MemoryAPI {
                     conversationId,
                     query,
                     topK: options?.topK,
-                    embeddingProfile: options?.embeddingProfile,
+                    threshold: options?.threshold,
                     scope: { type: 'conversation', id: conversationId },
                 })
                 emitMemory({ action: 'search', input, output: result })
@@ -357,7 +364,8 @@ export function createMemoryApi(args: ContextToolArgs): MemoryAPI {
             }
         },
         ingest: async (inputData: MemoryIngestInput, options?: MemoryIngestOptions): Promise<MemoryIngestResult | MemoryIngestResult[]> => {
-            const wait = options?.wait ?? 'load'
+            const ingestOptions = buildIngestOptions(options)
+            const wait = ingestOptions.wait ?? 'full'
             const inputKind = getIngestKind(inputData)
             const itemCount = Array.isArray(inputData) ? inputData.length : 1
             console.debug('[MEMORY][strategy_tool]', 'ingest', {
@@ -379,16 +387,7 @@ export function createMemoryApi(args: ContextToolArgs): MemoryAPI {
                         filename: 'ingest.txt',
                         mime: 'text/plain',
                         text: item,
-                        options: {
-                            wait,
-                            embeddingProfile: options?.embeddingProfile,
-                            chunkSize: options?.chunkSize,
-                            chunkOverlap: options?.chunkOverlap,
-                            tags: options?.tags,
-                            type: options?.type,
-                            sourceMessageId: options?.sourceMessageId,
-                            indexing: options?.indexing,
-                        },
+                        options: ingestOptions,
                     }
                     try {
                         results.push(await hostClient.ingestDocument(req))
@@ -400,20 +399,15 @@ export function createMemoryApi(args: ContextToolArgs): MemoryAPI {
                     continue
                 }
                 if (item && typeof item === 'object' && 'assetId' in item && typeof item.assetId === 'string') {
+                    const assetId = item.assetId.trim()
+                    if (!assetId) {
+                        throw createUnsupportedInputError('MEMORY_INPUT_UNSUPPORTED')
+                    }
                     const req = {
                         conversationId,
-                        assetId: item.assetId,
-                        filename: item.assetId,
-                        options: {
-                            wait,
-                            embeddingProfile: options?.embeddingProfile,
-                            chunkSize: options?.chunkSize,
-                            chunkOverlap: options?.chunkOverlap,
-                            tags: options?.tags,
-                            type: options?.type,
-                            sourceMessageId: options?.sourceMessageId,
-                            indexing: options?.indexing,
-                        },
+                        assetId,
+                        filename: assetId,
+                        options: ingestOptions,
                     }
                     try {
                         results.push(await hostClient.ingestDocument(req))
@@ -435,16 +429,7 @@ export function createMemoryApi(args: ContextToolArgs): MemoryAPI {
                             mime,
                             text: doc.text,
                             data: doc.data,
-                            options: {
-                                wait,
-                                embeddingProfile: options?.embeddingProfile,
-                                chunkSize: options?.chunkSize,
-                                chunkOverlap: options?.chunkOverlap,
-                                tags: options?.tags,
-                                type: options?.type,
-                                sourceMessageId: options?.sourceMessageId,
-                                indexing: options?.indexing,
-                            },
+                            options: ingestOptions,
                         }
                         try {
                             results.push(await hostClient.ingestDocument(req))
@@ -463,17 +448,24 @@ export function createMemoryApi(args: ContextToolArgs): MemoryAPI {
             emitMemory({ action: 'ingest', input: debugInput, output })
             return output
         },
-        readAsset: async (asset: string | Attachment, maxChars?: number) => {
-            const assetId = resolveAssetId(asset)
+        readAsset: async (asset: string | Attachment, options?: { maxChars?: number }) => {
+            const assetId = resolveAssetId(asset).trim()
+            if (!assetId) {
+                throw new Error('MEMORY_ASSET_ID_REQUIRED')
+            }
             console.debug('[MEMORY][strategy_tool]', 'readAsset', {
                 conversationId,
                 strategyId: strategyId ?? null,
                 assetId,
-                maxChars: maxChars ?? null,
+                maxChars: options?.maxChars ?? null,
             })
-            const input = { assetId, maxChars }
+            const input = { assetId, options }
             try {
-                const result = await hostClient.executeMemoryReadAsset({ conversationId, assetId, maxChars })
+                const result = await hostClient.executeMemoryReadAsset({
+                    conversationId,
+                    assetId,
+                    maxChars: options?.maxChars,
+                })
                 emitMemory({ action: 'readAsset', input, output: summarizeText(result) })
                 return result
             } catch (err) {
@@ -482,27 +474,15 @@ export function createMemoryApi(args: ContextToolArgs): MemoryAPI {
                 throw err
             }
         },
-        retireBySourceMessage: async (messageId: string) => {
-            const input = { messageId }
-            try {
-                const result = await hostClient.memoryRetireBySourceMessage({ conversationId, messageId })
-                emitMemory({ action: 'retireBySourceMessage', input, output: result })
-                return result
-            } catch (err) {
-                const msg = err instanceof Error ? err.message : String(err)
-                emitMemory({ action: 'retireBySourceMessage', input, error: msg })
-                throw err
-            }
-        },
-        retireMemory: async (memoryId: string) => {
+        removeMemory: async (memoryId: string) => {
             const input = { memoryId }
             try {
-                const result = await hostClient.memoryRetireMemory({ conversationId, memoryId })
-                emitMemory({ action: 'retireMemory', input, output: result })
+                const result = await hostClient.memoryRemoveMemory({ conversationId, memoryId })
+                emitMemory({ action: 'removeMemory', input, output: result })
                 return result
             } catch (err) {
                 const msg = err instanceof Error ? err.message : String(err)
-                emitMemory({ action: 'retireMemory', input, error: msg })
+                emitMemory({ action: 'removeMemory', input, error: msg })
                 throw err
             }
         },

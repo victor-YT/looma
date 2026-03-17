@@ -16,7 +16,9 @@ Inside that worker, the platform provides a single runtime object called `ctx`.
 - read the current turn input
 - access conversation history
 - construct prompts
-- interact with memory or tools
+- call the active model
+- persist strategy state
+- interact with memory
 - communicate results back to the host
 
 Strategies never interact directly with the host runtime.
@@ -55,7 +57,9 @@ The current runtime context includes:
 - `ctx.budget`
 - `ctx.capabilities`
 - `ctx.slots`
-- `ctx.tools`
+- `ctx.llm`
+- `ctx.state`
+- `ctx.memory`
 - `ctx.utils`
 
 Each section is documented in its own page.
@@ -117,7 +121,7 @@ Strategies should never:
 
 These responsibilities are handled by the Looma host runtime.
 
-Strategies only describe **how the prompt should be constructed** and **how tools should be used**.
+Strategies only describe **how the prompt should be constructed** and **how host-backed APIs should be used**.
 
 The host is responsible for:
 

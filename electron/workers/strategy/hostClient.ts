@@ -11,8 +11,8 @@ import type {
     RunResult,
     ToolChoice,
     ToolDefinition,
+    MemoryRecord,
     MemoryQueryOptions,
-    UIMemoryCloudItem,
 } from '../../../contracts'
 
 type HostRequestType =
@@ -26,8 +26,7 @@ type HostRequestType =
     | 'executeMemoryDeleteAsset'
     | 'ingestDocument'
     | 'memoryQuery'
-    | 'memoryRetireBySourceMessage'
-    | 'memoryRetireMemory'
+    | 'memoryRemoveMemory'
     | 'stateGet'
     | 'stateSet'
     | 'stateDelete'
@@ -136,25 +135,17 @@ class HostClient {
         return { assetId: '', chunkCount: 0, status: 'failed', error: 'ingest failed' }
     }
 
-    async memoryQuery(args: { conversationId: string; options?: MemoryQueryOptions }): Promise<UIMemoryCloudItem[]> {
+    async memoryQuery(args: { conversationId: string; options?: MemoryQueryOptions }): Promise<MemoryRecord[]> {
         const result = await this.request('memoryQuery', args)
-        return Array.isArray(result) ? result as UIMemoryCloudItem[] : []
+        return Array.isArray(result) ? result as MemoryRecord[] : []
     }
 
-    async memoryRetireBySourceMessage(args: { conversationId: string; messageId: string }): Promise<{ retired: number }> {
-        const result = await this.request('memoryRetireBySourceMessage', args)
-        if (result && typeof result === 'object' && 'retired' in result) {
-            return result as { retired: number }
+    async memoryRemoveMemory(args: { conversationId: string; memoryId: string }): Promise<{ deleted: boolean }> {
+        const result = await this.request('memoryRemoveMemory', args)
+        if (result && typeof result === 'object' && 'deleted' in result) {
+            return result as { deleted: boolean }
         }
-        return { retired: 0 }
-    }
-
-    async memoryRetireMemory(args: { conversationId: string; memoryId: string }): Promise<{ retired: boolean }> {
-        const result = await this.request('memoryRetireMemory', args)
-        if (result && typeof result === 'object' && 'retired' in result) {
-            return result as { retired: boolean }
-        }
-        return { retired: false }
+        return { deleted: false }
     }
 
     async stateGet(args: { conversationId: string; strategyId: string; key: string }): Promise<unknown> {

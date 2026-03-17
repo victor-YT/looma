@@ -1,6 +1,6 @@
 import type { MemoryChunkSearchRequest, MemoryIngestRequest, MemoryQueryOptions } from '../../../../contracts/index'
 import { getDB } from '../../../db'
-import { listAssets, deleteAsset, listMemoryCloud, deleteMemoryItem, retireMemoriesBySourceMessage } from '../../../core/memory/memoryStore'
+import { listAssets, deleteAsset, queryMemoryRecords, deleteMemoryItem } from '../../../core/memory/memoryStore'
 import { strategyMemoryIngest, strategyMemoryReadAsset, strategyMemorySearch } from '../../../core/strategy/strategyMemory'
 
 export function createMemoryBridge() {
@@ -12,7 +12,7 @@ export function createMemoryBridge() {
                 query: req.query,
                 options: {
                     topK: req.topK,
-                    embeddingProfile: req.embeddingProfile,
+                    threshold: req.threshold,
                 },
             })
         },
@@ -35,19 +35,22 @@ export function createMemoryBridge() {
         },
         memoryQuery: async ({ conversationId, options }: { conversationId: string; options?: MemoryQueryOptions }) => {
             const db = getDB()
-            const limit = options?.limit
-            const offset = options?.offset
-            return listMemoryCloud(db, { conversationId, limit, offset, order: 'newest' })
+            return queryMemoryRecords(db, {
+                conversationId,
+                tags: options?.tags,
+                types: options?.types,
+                pinned: options?.pinned,
+                hasAsset: options?.hasAsset,
+                orderBy: options?.orderBy,
+                order: options?.order,
+                limit: options?.limit,
+                offset: options?.offset,
+            })
         },
-        memoryRetireBySourceMessage: async ({ conversationId, messageId }: { conversationId: string; messageId: string }) => {
+        memoryRemoveMemory: async ({ conversationId, memoryId }: { conversationId: string; memoryId: string }) => {
             const db = getDB()
-            const retired = retireMemoriesBySourceMessage(db, { conversationId, messageId })
-            return { retired }
-        },
-        memoryRetireMemory: async ({ conversationId, memoryId }: { conversationId: string; memoryId: string }) => {
-            const db = getDB()
-            deleteMemoryItem(db, { conversationId, memoryId })
-            return { retired: true }
+            const deleted = deleteMemoryItem(db, { conversationId, memoryId })
+            return { deleted }
         },
     }
 }

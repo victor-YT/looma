@@ -358,10 +358,13 @@ export async function materializeAttachmentParts(args: {
             filename: attachment.name,
             mime: attachment.mimeType,
             data: attachment.data,
+            source: {
+                conversationId: args.conversationId,
+                messageId: args.userMessageId,
+            },
             options: {
                 wait: 'load',
-                indexing: 'rawOnly',
-                sourceMessageId: args.userMessageId,
+                mode: 'raw',
                 type: 'attachment.message',
             },
         })
