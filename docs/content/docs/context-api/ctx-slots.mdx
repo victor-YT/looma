@@ -11,7 +11,7 @@ description: ctx.slots is the prompt assembly API used by strategies during cont
 interface Slots {
   add(
     name: string,
-    content: string | Message | Message[] | null,
+    content: string | Message | Message[] | Input | null,
     options?: {
       priority?: number
       maxRatio?: number

@@ -59,6 +59,16 @@ function readMetaIngestStatus(meta: string | null | undefined): string | null {
     return typeof value === 'string' && value.trim().length > 0 ? value.trim().toLowerCase() : null
 }
 
+function buildStoredMeta(
+    userMeta: Record<string, unknown> | undefined,
+    runtimeMeta: Record<string, unknown>,
+): Record<string, unknown> {
+    return {
+        ...(userMeta ?? {}),
+        ...runtimeMeta,
+    }
+}
+
 function cleanupConflictSideEffects(args: {
     db: Database
     candidateMemoryId: string
@@ -252,7 +262,7 @@ export async function ingestDocument(
                 modality: routedModality,
                 textRepr: filename || 'asset',
                 tags: options.tags,
-                meta: {
+                meta: buildStoredMeta(options.meta, {
                     filename,
                     mime: mimeType,
                     sha256: assetSha256,
@@ -263,7 +273,7 @@ export async function ingestDocument(
                     loader_kind: loadedPreview?.kind ?? null,
                     loader_text_chars: loadedPreview?.textLength ?? 0,
                     loader_text_preview: loadedPreview?.text.slice(0, 200) ?? '',
-                },
+                }),
                 source: input.source,
             })
 
@@ -284,7 +294,7 @@ export async function ingestDocument(
                     mimeType,
                     sha256: assetSha256,
                     sizeBytes: hasFile ? (input.data?.byteLength ?? sourceBytes.length) : sourceBytes.length,
-                    metaJson: JSON.stringify({
+                    metaJson: JSON.stringify(buildStoredMeta(options.meta, {
                         filename,
                         mime: mimeType,
                         sha256: assetSha256,
@@ -296,7 +306,7 @@ export async function ingestDocument(
                         loader_kind: loadedPreview?.kind ?? null,
                         loader_text_chars: loadedPreview?.textLength ?? 0,
                         loader_text_preview: loadedPreview?.text.slice(0, 200) ?? '',
-                    }),
+                    })),
                     createdAt: now,
                 },
             })
@@ -391,7 +401,7 @@ export async function ingestDocument(
             modality,
             textRepr: filename || 'document',
             tags: options.tags,
-            meta: {
+            meta: buildStoredMeta(options.meta, {
                 filename,
                 mime: mimeType,
                 sha256: assetSha256,
@@ -402,7 +412,7 @@ export async function ingestDocument(
                 loader_kind: loadedPreview?.kind ?? null,
                 loader_text_chars: loadedPreview?.textLength ?? 0,
                 loader_text_preview: loadedPreview?.text.slice(0, 200) ?? '',
-            },
+            }),
             source: input.source,
         })
 
@@ -423,7 +433,7 @@ export async function ingestDocument(
                 mimeType,
                 sha256: assetSha256,
                 sizeBytes: hasFile ? (input.data?.byteLength ?? sourceBytes.length) : Buffer.byteLength(normalized, 'utf8'),
-                metaJson: JSON.stringify({
+                metaJson: JSON.stringify(buildStoredMeta(options.meta, {
                     filename,
                     mime: mimeType,
                     sha256: assetSha256,
@@ -435,7 +445,7 @@ export async function ingestDocument(
                     loader_kind: loadedPreview?.kind ?? null,
                     loader_text_chars: loadedPreview?.textLength ?? 0,
                     loader_text_preview: loadedPreview?.text.slice(0, 200) ?? '',
-                }),
+                })),
                 createdAt: now,
             },
         })

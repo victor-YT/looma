@@ -9,6 +9,38 @@ import type {
     Modality,
 } from '../../../contracts/index'
 
+function parseTags(raw: string | null | undefined): string[] {
+    if (!raw) return []
+    try {
+        const parsed = JSON.parse(raw)
+        if (!Array.isArray(parsed)) return []
+        return parsed.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    } catch {
+        return []
+    }
+}
+
+function normalizeTagFilter(tags: string[] | undefined): string[] {
+    if (!tags?.length) return []
+    const seen = new Set<string>()
+    const normalized: string[] = []
+    for (const value of tags) {
+        if (typeof value !== 'string') continue
+        const tag = value.trim()
+        if (!tag || seen.has(tag)) continue
+        seen.add(tag)
+        normalized.push(tag)
+    }
+    return normalized
+}
+
+function matchesTag(recordTags: string[], tag: string, pinned: boolean): boolean {
+    if (tag === 'pinned') {
+        return pinned || recordTags.includes(tag)
+    }
+    return recordTags.includes(tag)
+}
+
 export async function searchChunks(
     db: Database,
     args: { conversationId: string; request: MemoryChunkSearchRequest },
@@ -25,6 +57,7 @@ export async function searchChunks(
         }
     }
     const profile = resolveEmbeddingProfile(undefined)
+    const tagFilter = normalizeTagFilter(args.request.tags)
     if (!query) {
         return { embeddingProfile: profile.name, chunks: [] }
     }
@@ -37,6 +70,8 @@ export async function searchChunks(
         SELECT v.chunk_id, v.dim, v.vector,
                c.id AS c_id, c.asset_id, c.idx, c.text,
                a.id AS a_id,
+               m.tags AS memory_tags,
+               m.pinned AS memory_pinned,
                v.conversation_id AS v_conversation_id,
                c.conversation_id AS c_conversation_id,
                a.conversation_id AS a_conversation_id,
@@ -54,6 +89,10 @@ export async function searchChunks(
         JOIN memory_assets a
             ON a.id = c.asset_id
            AND a.conversation_id = ?
+        JOIN memory_items m
+            ON m.id = a.memory_id
+           AND m.scope_type = 'conversation'
+           AND m.scope_id = ?
         WHERE v.conversation_id = ?
           AND v.strategy_key = ?
           AND v.strategy_version = ?
@@ -62,6 +101,7 @@ export async function searchChunks(
         args.conversationId,
         scope.strategyKey,
         scope.strategyVersion,
+        args.conversationId,
         args.conversationId,
         args.conversationId,
         scope.strategyKey,
@@ -74,6 +114,8 @@ export async function searchChunks(
         vector: Buffer
         asset_id: string
         a_id: string
+        memory_tags?: string | null
+        memory_pinned: 0 | 1
         idx: number
         text: string
         v_conversation_id: string
@@ -108,9 +150,16 @@ export async function searchChunks(
                 c_id: row.c_id,
                 c_asset_id: row.asset_id,
                 a_id: row.a_id,
+                memory_tags: row.memory_tags,
+                memory_pinned: row.memory_pinned,
                 embedding_profile: row.embedding_profile,
                 score,
             })
+        }
+        const memoryTags = parseTags(row.memory_tags)
+        const pinned = row.memory_pinned === 1
+        if (tagFilter.length && !tagFilter.every((tag) => matchesTag(memoryTags, tag, pinned))) {
+            continue
         }
         if (score <= 0) continue
         hits.push({

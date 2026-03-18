@@ -4,6 +4,7 @@ export type MemoryIngestOptions = {
     chunkSize?: number
     chunkOverlap?: number
     tags?: string[]
+    meta?: Record<string, unknown>
     type?: string
 }
 

@@ -96,6 +96,27 @@ function parseTags(raw: string | null | undefined): string[] {
     }
 }
 
+function normalizeTagFilter(tags: string[] | undefined): string[] {
+    if (!tags?.length) return []
+    const seen = new Set<string>()
+    const normalized: string[] = []
+    for (const value of tags) {
+        if (typeof value !== 'string') continue
+        const tag = value.trim()
+        if (!tag || seen.has(tag)) continue
+        seen.add(tag)
+        normalized.push(tag)
+    }
+    return normalized
+}
+
+function matchesTag(recordTags: string[], tag: string, pinned: boolean): boolean {
+    if (tag === 'pinned') {
+        return pinned || recordTags.includes(tag)
+    }
+    return recordTags.includes(tag)
+}
+
 function normalizePreview(value: string | null | undefined, max = 240): string | undefined {
     if (typeof value !== 'string') return undefined
     const trimmed = value.trim()
@@ -103,20 +124,11 @@ function normalizePreview(value: string | null | undefined, max = 240): string |
     return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max)}...`
 }
 
-function matchesAllTags(recordTags: string[], wanted: string[] | undefined): boolean {
-    if (!wanted?.length) return true
-    const tagSet = new Set(recordTags)
-    return wanted.every((tag) => tagSet.has(tag))
-}
-
 export function queryMemoryRecords(
     db: Database,
     args: {
         conversationId: string
         tags?: string[]
-        types?: string[]
-        pinned?: boolean
-        hasAsset?: boolean
         orderBy?: 'updatedAt' | 'createdAt'
         order?: 'desc' | 'asc'
         limit?: number
@@ -170,12 +182,11 @@ export function queryMemoryRecords(
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     }))
+    const wantedTags = normalizeTagFilter(args.tags)
 
     const filtered = records.filter((record) => {
-        if (args.types?.length && !args.types.includes(record.type)) return false
-        if (typeof args.pinned === 'boolean' && record.pinned !== args.pinned) return false
-        if (typeof args.hasAsset === 'boolean' && Boolean(record.assetId) !== args.hasAsset) return false
-        return matchesAllTags(record.tags, args.tags)
+        if (!wantedTags.length) return true
+        return wantedTags.every((tag) => matchesTag(record.tags, tag, record.pinned))
     })
 
     const orderBy = args.orderBy ?? 'updatedAt'

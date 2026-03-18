@@ -17,6 +17,7 @@ type StrategyMemorySearchInput = {
     query: string
     options?: {
         topK?: number
+        tags?: string[]
         threshold?: number
     }
 }
@@ -83,6 +84,7 @@ export async function strategyMemorySearch(
         const request = {
             query: args.query,
             topK: args.options?.topK,
+            tags: args.options?.tags,
             scope: { type: 'conversation' as const, id: args.conversationId },
         }
         const result = await searchChunks(db, {

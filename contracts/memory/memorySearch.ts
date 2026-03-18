@@ -4,6 +4,7 @@ export type MemoryChunkSearchRequest = {
     query: string
     scope?: { type: ScopeType; id: string }
     topK?: number
+    tags?: string[]
     threshold?: number
 }
 

@@ -14,7 +14,7 @@ export async function onContextBuild(ctx: LoomaContext): Promise<StrategyContext
     const history = ctx.history.recent(10) || []
 
     const items = await ctx.memory.query({
-        pinned: true,
+        tags: ['pinned'],
         orderBy: 'updatedAt',
         order: 'desc',
         limit: 200,

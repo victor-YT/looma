@@ -232,9 +232,6 @@ export type ToolChoice =
 
 export type MemoryQueryOptions = {
     tags?: string[]
-    types?: string[]
-    pinned?: boolean
-    hasAsset?: boolean
     orderBy?: 'updatedAt' | 'createdAt'
     order?: 'desc' | 'asc'
     limit?: number
@@ -243,6 +240,7 @@ export type MemoryQueryOptions = {
 
 export type MemorySearchOptions = {
     topK?: number
+    tags?: string[]
     threshold?: number
 }
 

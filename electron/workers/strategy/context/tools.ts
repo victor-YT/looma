@@ -171,6 +171,7 @@ function summarizeIngestInput(inputData: MemoryIngestInput, options?: MemoryInge
             chunkSize: options?.chunkSize,
             chunkOverlap: options?.chunkOverlap,
             tags: options?.tags,
+            meta: options?.meta,
             type: options?.type,
         },
     }
@@ -323,6 +324,7 @@ export function createMemoryApi(args: ContextToolArgs): MemoryAPI {
         chunkSize: options?.chunkSize,
         chunkOverlap: options?.chunkOverlap,
         tags: options?.tags,
+        meta: options?.meta,
         type: options?.type,
     })
 
@@ -352,6 +354,7 @@ export function createMemoryApi(args: ContextToolArgs): MemoryAPI {
                     conversationId,
                     query,
                     topK: options?.topK,
+                    tags: options?.tags,
                     threshold: options?.threshold,
                     scope: { type: 'conversation', id: conversationId },
                 })

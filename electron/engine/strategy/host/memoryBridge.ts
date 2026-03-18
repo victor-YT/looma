@@ -12,6 +12,7 @@ export function createMemoryBridge() {
                 query: req.query,
                 options: {
                     topK: req.topK,
+                    tags: req.tags,
                     threshold: req.threshold,
                 },
             })
@@ -38,9 +39,6 @@ export function createMemoryBridge() {
             return queryMemoryRecords(db, {
                 conversationId,
                 tags: options?.tags,
-                types: options?.types,
-                pinned: options?.pinned,
-                hasAsset: options?.hasAsset,
                 orderBy: options?.orderBy,
                 order: options?.order,
                 limit: options?.limit,

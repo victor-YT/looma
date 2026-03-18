@@ -87,7 +87,7 @@ interface MemoryIngestOptions {
   /**
    * Arbitrary structured metadata.
    */
-  meta?: Record<string, any>
+  meta?: Record<string, unknown>
 
 }
 ```
@@ -199,7 +199,8 @@ Example:
 
 ```ts
 const hits = await ctx.memory.search('project roadmap', {
-  topK: 5
+  topK: 5,
+  tags: ['roadmap']
 })
 ```
 
@@ -268,7 +269,8 @@ export async function onContextBuild(ctx) {
   const blocks: string[] = []
 
   for (const item of items) {
-    const content = await ctx.memory.readAsset(item.id, { maxChars: 5000 })
+    if (!item.assetId) continue
+    const content = await ctx.memory.readAsset(item.assetId, { maxChars: 5000 })
     if (content) {
       blocks.push(content)
     }
