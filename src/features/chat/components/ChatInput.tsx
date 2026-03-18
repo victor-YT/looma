@@ -22,14 +22,12 @@ import {
     ingestAssetsForTurn,
     isAttachmentUploadingForTurn,
 } from '@/features/chat/attachments/utils/ingestAssetsForTurn'
-import { useFileDrop } from '@/features/chat/attachments/hooks/useFileDrop'
 import { touchConversationActivity } from '@/features/chat/utils/touchConversationActivity'
 
 type DraftAttachment = TurnAttachment
 
 type ChatInputProps = {
     className?: string
-    onRegisterFileDropHandler?: ((handler: ((files: File[]) => void | Promise<void>) | null) => void) | undefined
 }
 
 function normalizeEditDraftAttachments(items?: TurnAttachment[]): TurnAttachment[] {
@@ -44,7 +42,13 @@ function normalizeEditDraftAttachments(items?: TurnAttachment[]): TurnAttachment
     }))
 }
 
-export default function ChatInput({ className, onRegisterFileDropHandler }: ChatInputProps) {
+function dragEventHasFiles(event: React.DragEvent<HTMLElement>): boolean {
+    const types = event.dataTransfer?.types
+    if (!types || types.length === 0) return false
+    return Array.from(types).includes('Files')
+}
+
+export default function ChatInput({ className }: ChatInputProps) {
     const selectedId = useChatStore(s => s.selectedConversationId)
     const busyInfo = useChatStore(s => (selectedId ? s.busyByConversation[selectedId] : undefined))
     const isBusy = !!busyInfo
@@ -89,6 +93,7 @@ export default function ChatInput({ className, onRegisterFileDropHandler }: Chat
     const autoAssignedStrategies = useRef<Set<string>>(new Set())
     const lastStrategyId = useRef<string | null>(null)
     const [forceWebSearch, setForceWebSearch] = useState(false)
+    const [isDraggingFiles, setIsDraggingFiles] = useState(false)
 
     // Measure the real ChatInput height, including padding and the draft bar
     const rootRef = useRef<HTMLDivElement | null>(null)
@@ -280,16 +285,42 @@ export default function ChatInput({ className, onRegisterFileDropHandler }: Chat
     }, [isDraftSelected, patchDraftAttachment, selectedConversation])
 
     useEffect(() => {
-        if (!onRegisterFileDropHandler) return
-        onRegisterFileDropHandler((files) => handlePickFiles(files))
-        return () => onRegisterFileDropHandler(null)
-    }, [handlePickFiles, onRegisterFileDropHandler])
+        if (!isDraggingFiles) return
+        const reset = () => setIsDraggingFiles(false)
+        window.addEventListener('dragend', reset)
+        window.addEventListener('drop', reset)
+        window.addEventListener('blur', reset)
+        return () => {
+            window.removeEventListener('dragend', reset)
+            window.removeEventListener('drop', reset)
+            window.removeEventListener('blur', reset)
+        }
+    }, [isDraggingFiles])
 
-    const composerDrop = useFileDrop<HTMLDivElement>({
-        onFiles: async (files) => {
-            await handlePickFiles(files)
-        },
-    })
+    const handleComposerDragEnter = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+        if (!dragEventHasFiles(event)) return
+        setIsDraggingFiles(true)
+    }, [])
+
+    const handleComposerDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+        if (!dragEventHasFiles(event)) return
+        const nextTarget = event.relatedTarget as Node | null
+        if (nextTarget && event.currentTarget.contains(nextTarget)) return
+        setIsDraggingFiles(false)
+    }, [])
+
+    const handleComposerDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+        if (!dragEventHasFiles(event)) return
+        event.preventDefault()
+        setIsDraggingFiles(true)
+    }, [])
+
+    const handleComposerDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+        if (!dragEventHasFiles(event)) return
+        event.preventDefault()
+        setIsDraggingFiles(false)
+        void handlePickFiles(event.dataTransfer.files)
+    }, [handlePickFiles])
 
     const removeAttachment = useCallback((id: string) => {
         setDraftAttachments((prev) => {
@@ -792,89 +823,84 @@ export default function ChatInput({ className, onRegisterFileDropHandler }: Chat
             <div className="mx-auto max-w-4xl rounded-[18px] bg-black/[0.08] p-[1px] shadow-[0_18px_48px_rgba(0,0,0,0.16)] dark:bg-white/[0.10] dark:shadow-none">
                 <div className="overflow-hidden rounded-[17px]">
                     {/* Keep the real background on the inner layer so rounded-corner comparisons stay consistent */}
-                <div
-                    className={clsx(
-                        "ui-base relative bg-bg-inputarea",
-                        "px-2 pt-3 pb-1 transition-colors",
-                        composerDrop.isDraggingOver && "bg-bg-sidebar-button-hover cursor-copy"
-                    )}
-                    {...composerDrop.dropZoneProps}
-                >
-                    {composerDrop.isDraggingOver ? (
-                        <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-black/40">
-                            <div className="grid h-12 w-12 place-items-center rounded-full bg-emerald-500 text-white">
-                                <Plus className="h-6 w-6" />
-                            </div>
-                        </div>
-                    ) : null}
-
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        className="hidden"
-                        multiple
-                        accept={pickerAccept || undefined}
-                        onChange={(event) => {
-                            void handlePickFiles(event.target.files)
-                            event.currentTarget.value = ''
-                        }}
-                    />
-
-                    <InputAttachmentsBar
-                        attachments={draftAttachments}
-                        issues={attachmentIssues}
-                        onRemove={removeAttachment}
-                    />
-
-                    <textarea
-                        id="composer-input"
-                        ref={textAreaRef}
-                        rows={1}
-                        placeholder="Type a message..."
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        onCompositionStart={handleCompositionStart}
-                        onCompositionEnd={handleCompositionEnd}
-                        onPaste={handlePaste}
+                    <div
                         className={clsx(
-                            "w-full resize-none bg-transparent outline-none",
-                            "text-[14px] font-medium pt-1 leading-[1.5]",
-                            "placeholder:opacity-40",
-                            "px-2 overflow-y-hidden"
+                            "ui-base relative bg-bg-inputarea",
+                            "px-2 pt-3 pb-1 transition-colors",
+                            isDraggingFiles && "cursor-copy bg-black/[0.05] dark:bg-white/[0.05]"
                         )}
-                    />
+                        onDragEnter={handleComposerDragEnter}
+                        onDragLeave={handleComposerDragLeave}
+                        onDragOver={handleComposerDragOver}
+                        onDrop={handleComposerDrop}
+                    >
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            className="hidden"
+                            multiple
+                            accept={pickerAccept || undefined}
+                            onChange={(event) => {
+                                void handlePickFiles(event.target.files)
+                                event.currentTarget.value = ''
+                            }}
+                        />
 
-                    <div className="mt-1 flex items-center justify-between">
-                        <div className="flex items-center gap-1">
-                            <button
-                                className="h-9 w-9 rounded-full grid place-items-center cursor-pointer
+                        <InputAttachmentsBar
+                            attachments={draftAttachments}
+                            issues={attachmentIssues}
+                            onRemove={removeAttachment}
+                        />
+
+                        <textarea
+                            id="composer-input"
+                            ref={textAreaRef}
+                            rows={1}
+                            placeholder="Type a message..."
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            onCompositionStart={handleCompositionStart}
+                            onCompositionEnd={handleCompositionEnd}
+                            onPaste={handlePaste}
+                            className={clsx(
+                                "w-full resize-none bg-transparent outline-none",
+                                "text-[14px] font-medium pt-1 leading-[1.5]",
+                                "placeholder:opacity-40",
+                                "px-2 overflow-y-hidden"
+                            )}
+                        />
+
+                        <div className="mt-1 flex items-center justify-between">
+                            <div className="flex items-center gap-1">
+                                <button
+                                    className="h-9 w-9 rounded-full grid place-items-center cursor-pointer
                          ui-fast ui-press text-tx/80 hover:bg-bg-iconbutton-button-hover transition-colors"
-                                aria-label="Attach"
-                                onClick={() => fileInputRef.current?.click()}
-                            >
-                                <Plus className="w-6 h-6" />
-                            </button>
+                                    aria-label="Attach"
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
+                                    <Plus className="w-6 h-6" />
+                                </button>
 
-                            <button
-                                className={clsx(
-                                    "h-9 w-9 rounded-full grid place-items-center cursor-pointer",
-                                    "ui-fast ui-press hover:bg-bg-iconbutton-button-hover transition-colors",
-                                    forceWebSearch && "bg-bg-iconbutton-button-active text-sky-400"
-                                )}
-                                aria-label="Web search (force)"
-                                onClick={handleToggleWebSearch}
-                            >
-                                <Globe
+                                <button
                                     className={clsx(
-                                        "w-5 h-5",
-                                        forceWebSearch ? "text-sky-400" : "text-tx/80"
+                                        "h-9 w-9 rounded-full grid place-items-center cursor-pointer",
+                                        "ui-fast ui-press hover:bg-bg-iconbutton-button-hover transition-colors",
+                                        forceWebSearch && "bg-bg-iconbutton-button-active text-sky-400"
                                     )}
-                                />
-                            </button>
-                        </div>
+                                    aria-label="Web search (force)"
+                                    onClick={handleToggleWebSearch}
+                                >
+                                    <Globe
+                                        className={clsx(
+                                            "w-5 h-5",
+                                            forceWebSearch ? "text-sky-400" : "text-tx/80"
+                                        )}
+                                    />
+                                </button>
+                            </div>
 
-                        <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2">
                             <DropdownMenu.Root>
                                 <DropdownMenu.Trigger asChild>
                                     <button

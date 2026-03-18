@@ -12,6 +12,12 @@ type MemoryCloudBarProps = {
     conversationId: string | null
 }
 
+function dragEventHasFiles(event: React.DragEvent<HTMLElement>): boolean {
+    const types = event.dataTransfer?.types
+    if (!types || types.length === 0) return false
+    return Array.from(types).includes("Files")
+}
+
 export default function MemoryCloudBar({ conversationId }: MemoryCloudBarProps) {
     const memoryCloudOrderByConversation = useChatStore((s) => s.memoryCloudOrderByConversation)
     const setMemoryCloudOrder = useChatStore((s) => s.setMemoryCloudOrder)
@@ -26,9 +32,9 @@ export default function MemoryCloudBar({ conversationId }: MemoryCloudBarProps) 
         disabledReason,
     } = useMemoryCloud(conversationId)
 
-    const [dragActive, setDragActive] = useState(false)
     const [expanded, setExpanded] = useState(false)
     const [draggingId, setDraggingId] = useState<string | null>(null)
+    const [isDraggingFiles, setIsDraggingFiles] = useState(false)
     const [hasLeftOverflow, setHasLeftOverflow] = useState(false)
     const [hasRightOverflow, setHasRightOverflow] = useState(false)
 
@@ -51,24 +57,6 @@ export default function MemoryCloudBar({ conversationId }: MemoryCloudBarProps) 
         window.addEventListener("mousedown", onMouseDown)
         return () => window.removeEventListener("mousedown", onMouseDown)
     }, [expanded])
-
-    useEffect(() => {
-        if (!dragActive) return
-
-        const resetDragActive = () => setDragActive(false)
-
-        window.addEventListener("dragend", resetDragActive)
-        window.addEventListener("drop", resetDragActive)
-        window.addEventListener("blur", resetDragActive)
-        document.addEventListener("visibilitychange", resetDragActive)
-
-        return () => {
-            window.removeEventListener("dragend", resetDragActive)
-            window.removeEventListener("drop", resetDragActive)
-            window.removeEventListener("blur", resetDragActive)
-            document.removeEventListener("visibilitychange", resetDragActive)
-        }
-    }, [dragActive])
 
     const disabled = disabledReason === "disabled"
     const savedOrder = useMemo(
@@ -144,6 +132,44 @@ export default function MemoryCloudBar({ conversationId }: MemoryCloudBarProps) 
         },
         [disabled, ingestFiles, ingesting]
     )
+
+    useEffect(() => {
+        if (!isDraggingFiles) return
+        const reset = () => setIsDraggingFiles(false)
+        window.addEventListener("dragend", reset)
+        window.addEventListener("drop", reset)
+        window.addEventListener("blur", reset)
+        return () => {
+            window.removeEventListener("dragend", reset)
+            window.removeEventListener("drop", reset)
+            window.removeEventListener("blur", reset)
+        }
+    }, [isDraggingFiles])
+
+    const handleCloudDragEnter = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+        if (disabled || ingesting || !dragEventHasFiles(event)) return
+        setIsDraggingFiles(true)
+    }, [disabled, ingesting])
+
+    const handleCloudDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+        if (!dragEventHasFiles(event)) return
+        const nextTarget = event.relatedTarget as Node | null
+        if (nextTarget && event.currentTarget.contains(nextTarget)) return
+        setIsDraggingFiles(false)
+    }, [])
+
+    const handleCloudDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+        if (disabled || ingesting || !dragEventHasFiles(event)) return
+        event.preventDefault()
+        setIsDraggingFiles(true)
+    }, [disabled, ingesting])
+
+    const handleCloudDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+        if (!dragEventHasFiles(event)) return
+        event.preventDefault()
+        setIsDraggingFiles(false)
+        void handleFiles(event.dataTransfer.files)
+    }, [handleFiles])
 
     const moveItem = useCallback(
         (fromId: string, toId: string) => {
@@ -247,18 +273,10 @@ export default function MemoryCloudBar({ conversationId }: MemoryCloudBarProps) 
         <div
             ref={wrapperRef}
             className="group/memory-cloud relative h-full [-webkit-app-region:no-drag]"
-            onDragOver={(event) => {
-                event.preventDefault()
-                if (!disabled) setDragActive(true)
-            }}
-            onDragLeave={() => setDragActive(false)}
-            onDrop={(event) => {
-                event.preventDefault()
-                setDragActive(false)
-                if (event.dataTransfer.files?.length) {
-                    void handleFiles(event.dataTransfer.files)
-                }
-            }}
+            onDragEnter={handleCloudDragEnter}
+            onDragLeave={handleCloudDragLeave}
+            onDragOver={handleCloudDragOver}
+            onDrop={handleCloudDrop}
             onPaste={(event) => {
                 if (disabled || ingesting) return
                 const files = event.clipboardData?.files
@@ -283,9 +301,9 @@ export default function MemoryCloudBar({ conversationId }: MemoryCloudBarProps) 
 
             <div
                 className={clsx(
-                    "flex flex-col overflow-hidden rounded-3xl border border-border/50 bg-bg-inputarea backdrop-blur-xl",
-                    "transition-colors",
-                    dragActive ? "ring-1 ring-ring" : undefined,
+                    "relative flex flex-col overflow-hidden rounded-3xl border border-border/50 bg-bg-inputarea backdrop-blur-xl",
+                    "transition-colors duration-200 ease-out",
+                    isDraggingFiles && "bg-black/[0.04] dark:bg-white/[0.04]",
                     disabled ? "opacity-60" : undefined
                 )}
             >
@@ -295,7 +313,7 @@ export default function MemoryCloudBar({ conversationId }: MemoryCloudBarProps) 
                             <div
                                 className={clsx(
                                     "absolute inset-0 grid place-items-center text-tx transition-[opacity,transform] duration-200 ease-out",
-                                    "translate-x-0 opacity-100"
+                                    "translate-y-0 opacity-100"
                                 )}
                                 aria-hidden="true"
                             >
@@ -310,7 +328,9 @@ export default function MemoryCloudBar({ conversationId }: MemoryCloudBarProps) 
                             <div
                                 className={clsx(
                                     "absolute inset-0 transition-[opacity,transform] duration-200 ease-out",
-                                    expanded ? "pointer-events-none translate-y-1 opacity-0" : "translate-y-0 opacity-100"
+                                    expanded || isDraggingFiles
+                                        ? "pointer-events-none translate-y-1 opacity-0"
+                                        : "translate-y-0 opacity-100"
                                 )}
                             >
                                 <div
@@ -363,7 +383,11 @@ export default function MemoryCloudBar({ conversationId }: MemoryCloudBarProps) 
                             <div
                                 className={clsx(
                                     "absolute inset-0 flex items-center justify-center text-center text-xs font-medium text-tx/55 transition-[opacity,transform] duration-200 ease-out",
-                                    expanded ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-[-4px] opacity-0"
+                                    isDraggingFiles
+                                        ? "translate-y-0 opacity-100"
+                                        : expanded
+                                            ? "translate-y-0 opacity-100"
+                                            : "pointer-events-none translate-y-[-4px] opacity-0"
                                 )}
                             >
                                 Drag or click to upload assets
