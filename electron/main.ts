@@ -46,7 +46,9 @@ const menu = Menu.buildFromTemplate([
       { type: 'separator' },
       { role: 'cut' },
       { role: 'copy' },
-      { role: 'paste' }
+      { role: 'paste' },
+      { type: 'separator' },
+      { role: 'selectAll' }
     ]
   },
   {
@@ -133,4 +135,3 @@ app.whenReady().then(async () => {
 
   openMainWindow()
 })
-
