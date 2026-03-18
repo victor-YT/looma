@@ -440,8 +440,9 @@ export default function ChatArea({ className }: ChatAreaProps) {
         // done: write terminal state by asstId; never replaceTurns here to avoid wiping assistants[]
         const onDone = (_e: ElectronIpcRendererEvent, data: LlmStreamDoneEventData) => {
             const st = chatStore.getState()
-            const busy = st.busyByConversation[data.conversation_id]
-            if (busy?.replyId === data.reply_id) clearBusy(data.conversation_id)
+            if (st.busyByConversation[data.conversation_id]) {
+                clearBusy(data.conversation_id)
+            }
 
             if (selectedConversationId !== data.conversation_id) return
 

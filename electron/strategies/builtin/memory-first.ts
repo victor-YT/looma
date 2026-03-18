@@ -1,69 +1,69 @@
-import type { LoomaContext, StrategyContextBuildResult } from '../../../contracts/index'
-
-export const meta = {
-    name: 'Cloud',
-    description: 'Memory Cloud test strategy',
-    version: '0.2.5',
-    features: { memoryCloud: true },
-}
+import { defineStrategy } from '../../../contracts'
 
 export const configSchema = []
 
-export async function onContextBuild(ctx: LoomaContext): Promise<StrategyContextBuildResult> {
-    const text = (ctx.input.text || '').trim()
-    const history = ctx.history.recent(10) || []
+export default defineStrategy({
+    meta: {
+        name: 'Cloud',
+        description: 'Persistent memory-enabled assistant',
+        version: '0.1.0',
+        features: { memoryCloud: true },
+    },
 
-    const items = await ctx.memory.query({
-        tags: ['pinned'],
-        orderBy: 'updatedAt',
-        order: 'desc',
-        limit: 200,
-    })
+    configSchema,
 
-    const blocks: string[] = []
+    async onContextBuild(ctx) {
+        const history = ctx.history.recent(10)
 
-    for (const item of items) {
-        if (!item.assetId) continue
-        try {
-            const content = await ctx.memory.readAsset(item.assetId, { maxChars: 20000 })
+        // 1. load memory (no embedding / no search)
+        const items = await ctx.memory.query({
+            orderBy: 'updatedAt',
+            limit: 10,
+        })
+
+        const memoryBlocks: string[] = []
+
+        for (const item of items) {
+            if (!item.assetId) continue
+
+            const content = await ctx.memory.readAsset(item.assetId, {
+                maxChars: 3000,
+            })
+
             if (content) {
-                blocks.push(`### ${item.title || item.type}\n${content}`)
+                memoryBlocks.push(content)
             }
-        } catch {
-            // ignore read errors
         }
-    }
 
-    ctx.slots.add(
-        'system',
-        { role: 'system', content: 'You are a helpful assistant.' },
-        { priority: 10, position: 0 }
-    )
+        // 2. build memory section
+        let memorySection = ''
 
-    if (blocks.length) {
-        ctx.slots.add(
-            'memoryCloud',
-            {
-                role: 'system',
-                content: `Memory Cloud Assets:\n\n${blocks.join('\n\n')}`,
-            },
-            { priority: 6, position: 8, trimBehavior: 'char' }
-        )
-    }
+        if (memoryBlocks.length > 0) {
+            memorySection =
+                'The following is long-term memory from the user:\n\n' +
+                memoryBlocks.join('\n\n')
+        }
 
-    if (history.length) {
+        // 3. system prompt
+        const systemPrompt = memorySection
+            ? `You are a helpful assistant.\n\n${memorySection}`
+            : 'You are a helpful assistant.'
+
+        ctx.slots.add('system', systemPrompt, {
+            priority: 3,
+        })
+
+        // 4. history
         ctx.slots.add('history', history, {
             priority: 1,
-            position: 10,
             trimBehavior: 'message',
         })
-    }
 
-    ctx.slots.add(
-        'input',
-        { role: 'user', content: text || '(Empty input)' },
-        { priority: 5, position: 20 }
-    )
+        // 5. input
+        ctx.slots.add('input', ctx.input, {
+            priority: 2,
+        })
 
-    return { prompt: ctx.slots.render(), tools: [] }
-}
+        return ctx.slots.render()
+    },
+})

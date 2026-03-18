@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useChatStore, chatStore } from '@/features/chat/state/chatStore'
 import { sendUserMessage } from '@/features/chat/utils/sendUserMessage'
+import { chatService } from '@/shared/services/ipc/chatService'
 import { applyConversationSnapshot } from '@/features/chat/utils/applyConversationSnapshot'
 import { rowToTurn } from '@/features/chat/utils/rowToTurn'
 import { X, Plus, Globe, Square, ArrowUp, ChevronDown } from 'lucide-react'
@@ -198,6 +199,27 @@ export default function ChatInput({ className, onRegisterFileDropHandler }: Chat
     useEffect(() => {
         setDraftAttachments([])
     }, [selectedConversation?.id])
+
+    useEffect(() => {
+        if (!selectedId || !busyInfo?.replyId) return
+        let cancelled = false
+        const timer = window.setInterval(() => {
+            void chatService.isConversationBusy(selectedId)
+                .then((status) => {
+                    if (cancelled) return
+                    if (!status?.busy) {
+                        chatStore.getState().clearBusy(selectedId)
+                    }
+                })
+                .catch(() => {
+                    // ignore transient polling errors
+                })
+        }, 500)
+        return () => {
+            cancelled = true
+            window.clearInterval(timer)
+        }
+    }, [selectedId, busyInfo?.replyId])
 
     const prevAttachmentUrlsRef = useRef<Map<string, string>>(new Map())
     useEffect(() => {
