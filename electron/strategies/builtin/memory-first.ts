@@ -77,7 +77,6 @@ export default defineStrategy({
 
     async onTurnEnd(ctx) {
         // best-effort write, NEVER break flow
-
         try {
             const lastUser = ctx.history.lastUser?.()
             const lastAssistant = ctx.history.lastAssistant?.()
