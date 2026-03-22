@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Github, Moon, Navigation, PanelLeft, Search, Sun } from 'lucide-react';
@@ -50,6 +49,29 @@ function ThemeButton() {
   );
 }
 
+function HeaderLogo() {
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const logoSrc = mounted && resolvedTheme === 'dark'
+    ? '/logo_white.svg'
+    : '/logo_black.svg';
+
+  return (
+    <img
+      src={logoSrc}
+      alt="AfferLab logo"
+      width={23}
+      height={23}
+      className="h-[23px] w-[23px] shrink-0"
+    />
+  );
+}
+
 export function Header() {
   return (
     <header className="border-b fixed inset-x-0 top-0 z-50 w-full bg-fd-background/80 backdrop-blur-md">
@@ -64,20 +86,7 @@ export function Header() {
             <PanelLeft className="size-4" />
           </button>
           <Link href="/" className="inline-flex h-full shrink-0 items-center gap-2">
-            <Image
-              src="/logo_black.svg"
-              alt="AfferLab logo"
-              width={23}
-              height={23}
-              className="dark:hidden"
-            />
-            <Image
-              src="/logo_white.svg"
-              alt="AfferLab logo"
-              width={23}
-              height={23}
-              className="hidden dark:block"
-            />
+            <HeaderLogo />
             <span className="inline-flex items-center text-[23px] leading-none font-semibold tracking-tight text-black dark:text-white">
               {siteConfig.siteName}
             </span>
