@@ -148,6 +148,8 @@ const HOOK_NAMES = [
     'onContextBuild',
     'onInit',
     'onTurnEnd',
+    'onCloudAdd',
+    'onCloudRemove',
     'onReplayTurn',
     'onError',
     'onCleanup',

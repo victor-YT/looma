@@ -8,6 +8,7 @@ import {
     readAsset,
     deleteAsset,
 } from '../../core/memory/memoryStore'
+import { StrategyHost } from '../../strategies/strategyHost'
 import { getStrategyOrFallback } from '../../core/strategy/strategyRegistry'
 import { resolveStrategyMemoryCloudFeature } from '../../core/strategy/strategyFeatures'
 import { log } from '../../core/logging/runtimeLogger'
@@ -107,6 +108,13 @@ export function registerMemoryCloudIPC() {
             })
             if (result.status !== 'failed') {
                 touchConversation(db, payload.conversationId)
+                if (result.assetId) {
+                    const strategyHost = new StrategyHost(db)
+                    void strategyHost.runCloudAdd({
+                        conversationId: payload.conversationId,
+                        payload: { assetId: result.assetId },
+                    })
+                }
             }
             return result as MemoryIngestResult
         } catch (err) {
@@ -184,6 +192,11 @@ export function registerMemoryCloudIPC() {
             const db = getDB()
             deleteAsset(db, { conversationId: args.conversationId, assetId: args.assetId })
             touchConversation(db, args.conversationId)
+            const strategyHost = new StrategyHost(db)
+            void strategyHost.runCloudRemove({
+                conversationId: args.conversationId,
+                payload: { assetId: args.assetId },
+            })
             log('info', '[MEMORY_CLOUD][ipc_delete_asset_done]', {
                 conversationId: args.conversationId,
                 assetId: args.assetId,

@@ -1,4 +1,6 @@
 export type {
+    CloudAddPayload,
+    CloudRemovePayload,
     ConversationStrategyUpdateRequest,
     ConversationStrategyUpdateResponse,
     HistorySelectionDebug,

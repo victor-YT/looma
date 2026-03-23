@@ -19,7 +19,7 @@ import type {
     StrategyDevEvent,
 } from '../../../contracts'
 
-type RequestType = 'init' | 'contextBuild' | 'turnEnd' | 'toolCall' | 'replayTurn' | 'dispose'
+type RequestType = 'init' | 'contextBuild' | 'turnEnd' | 'cloudAdd' | 'cloudRemove' | 'toolCall' | 'replayTurn' | 'dispose'
 
 type StrategyWorkerRequest = {
     id: string
@@ -103,6 +103,7 @@ export type HostHandlers = {
 
 const CONTEXT_BUILD_TIMEOUT_MS = 8000
 const TURN_END_TIMEOUT_MS = 15000
+const CLOUD_HOOK_TIMEOUT_MS = 5000
 const REPLAY_TURN_TIMEOUT_MS = 15000
 
 const DEFAULT_TOOL_CALL_TIMEOUT_MS = Number(process.env.TOOL_TIMEOUT_DEFAULT_MS ?? '8000')
@@ -153,6 +154,14 @@ export class WorkerManager {
 
     async requestTurnEnd(conversationId: string, payload: unknown): Promise<void> {
         await this.request(conversationId, 'turnEnd', payload, TURN_END_TIMEOUT_MS)
+    }
+
+    async requestCloudAdd(conversationId: string, payload: unknown): Promise<void> {
+        await this.request(conversationId, 'cloudAdd', payload, CLOUD_HOOK_TIMEOUT_MS)
+    }
+
+    async requestCloudRemove(conversationId: string, payload: unknown): Promise<void> {
+        await this.request(conversationId, 'cloudRemove', payload, CLOUD_HOOK_TIMEOUT_MS)
     }
 
     async requestToolCall(conversationId: string, payload: unknown): Promise<unknown> {

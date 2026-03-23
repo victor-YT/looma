@@ -352,6 +352,14 @@ export type MemoryAPI = {
     removeMemory(memoryId: string): Promise<{ deleted: boolean }>
 }
 
+export type CloudAddPayload = {
+    assetId: string
+}
+
+export type CloudRemovePayload = {
+    assetId: string
+}
+
 export type ToolsAPI = {
     llm: LLMTools
     state: StateTools
@@ -387,6 +395,8 @@ export type StrategyHooks<TConfig extends Record<string, unknown> = Record<strin
     onInit?: (ctx: AfferLabContext<TConfig>) => Promise<void> | void
     onContextBuild: (ctx: AfferLabContext<TConfig>) => Promise<StrategyContextBuildOutput> | StrategyContextBuildOutput
     onTurnEnd?: (ctx: AfferLabContext<TConfig>) => Promise<void> | void
+    onCloudAdd?: (ctx: AfferLabContext<TConfig>, payload: CloudAddPayload) => Promise<void> | void
+    onCloudRemove?: (ctx: AfferLabContext<TConfig>, payload: CloudRemovePayload) => Promise<void> | void
     onCleanup?: (ctx: AfferLabContext<TConfig>) => Promise<void> | void
     onError?: (ctx: AfferLabContext<TConfig>, error: unknown, phase: string) => Promise<void> | void
     onReplayTurn?: (ctx: StrategyReplayTurnInput) => Promise<void> | void
@@ -680,7 +690,7 @@ export type StrategyDevEvent =
     })
     | (StrategyDevEventBase & {
         type: 'error'
-        phase: StrategyDevEventPhase | 'init' | 'context' | 'turnEnd' | 'toolCall' | 'replay' | 'unknown'
+        phase: StrategyDevEventPhase | 'init' | 'context' | 'turnEnd' | 'toolCall' | 'replay' | 'cloudAdd' | 'cloudRemove' | 'unknown'
         message: string
         stack?: string
     })
@@ -758,6 +768,8 @@ export interface Strategy {
     allowedPermissions?: import('../tools').ToolPermissions
     onContextBuild(ctx: AfferLabContext): Promise<StrategyContextBuildOutput>
     onTurnEnd?(ctx: AfferLabContext): Promise<void>
+    onCloudAdd?(ctx: AfferLabContext, payload: CloudAddPayload): Promise<void>
+    onCloudRemove?(ctx: AfferLabContext, payload: CloudRemovePayload): Promise<void>
     onReplayTurn?(ctx: StrategyReplayTurnInput): Promise<void>
     onToolCall?(ctx: AfferLabContext, call: unknown): Promise<string>
 }

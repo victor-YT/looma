@@ -45,6 +45,42 @@ This is typically used for:
 
 ---
 
+## `onCloudAdd`
+
+If exported, `onCloudAdd` runs after a Memory Cloud asset is successfully added to the current conversation.
+
+This hook receives the normal strategy context plus a small payload:
+
+```ts
+type CloudAddPayload = {
+  assetId: string
+}
+```
+
+Use it when a strategy wants to react to newly added assets without changing the base Cloud storage flow.
+
+The hook is observational. The asset is already stored before the hook runs.
+
+---
+
+## `onCloudRemove`
+
+If exported, `onCloudRemove` runs after a Memory Cloud asset is successfully removed from the current conversation.
+
+This hook receives:
+
+```ts
+type CloudRemovePayload = {
+  assetId: string
+}
+```
+
+Use it for strategy-level cleanup or bookkeeping tied to Cloud asset removal.
+
+The hook runs after deletion, so strategies should treat the payload as an event notification rather than a request to inspect the removed asset.
+
+---
+
 ## `onReplayTurn`
 
 If exported, `onReplayTurn` runs when the host replays existing turns during a **strategy replay job**.

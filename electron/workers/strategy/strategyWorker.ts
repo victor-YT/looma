@@ -1,5 +1,7 @@
 import { parentPort } from 'node:worker_threads'
 import type {
+    CloudAddPayload,
+    CloudRemovePayload,
     LLMModelConfig,
     StrategyReplayTurnInput,
     StrategyScope,
@@ -18,7 +20,7 @@ import { hostClient } from './hostClient'
 import { loadStrategyModule } from './strategyLoader'
 import { buildContext } from './buildContext'
 
-type RequestType = 'init' | 'contextBuild' | 'turnEnd' | 'toolCall' | 'replayTurn' | 'dispose'
+type RequestType = 'init' | 'contextBuild' | 'turnEnd' | 'cloudAdd' | 'cloudRemove' | 'toolCall' | 'replayTurn' | 'dispose'
 
 type StrategyWorkerRequest = {
     id: string
@@ -65,6 +67,7 @@ type StrategyRequestPayload = {
     capabilityValues?: Capabilities
     message?: AfferLabMessage | null
     devMode?: boolean
+    cloudPayload?: CloudAddPayload | CloudRemovePayload
 }
 
 let loadedStrategy: StrategyModule | null = null
@@ -529,6 +532,33 @@ parentPort.on('message', async (req: StrategyWorkerRequest | WorkerEnvelope) => 
                 }
                 replyOk(req.id, { ok: true })
                 return
+            case 'cloudAdd':
+            case 'cloudRemove':
+                {
+                    const payload = (req.payload ?? {}) as StrategyRequestPayload
+                    updateDevContext(payload)
+                    const strategy = await ensureStrategy(payload)
+                    const hook = req.type === 'cloudAdd'
+                        ? strategy.hooks.onCloudAdd
+                        : strategy.hooks.onCloudRemove
+                    if (hook) {
+                        const ctx = await buildContext({
+                            conversationId: payload.conversationId,
+                            turnId: payload.turnId,
+                            model: payload.model,
+                            strategyId: payload.strategyId,
+                            configValues: payload.configValues,
+                            budgetValues: payload.budgetValues,
+                            capabilityValues: payload.capabilityValues,
+                            dev: { emit: (event) => emitDevEvent({ ...event, phase: resolvePhaseForEvent(event, 'system') }) },
+                        })
+                        lastCtx = ctx
+                        emitDevEvent({ type: 'context', data: snapshotContext(ctx), phase: 'system' })
+                        await hook(ctx, payload.cloudPayload as never)
+                    }
+                }
+                replyOk(req.id, { ok: true })
+                return
             case 'replayTurn': {
                 const payload = (req.payload ?? {}) as StrategyReplayTurnInput & StrategyRequestPayload
                 updateDevContext(payload)
@@ -630,6 +660,8 @@ parentPort.on('message', async (req: StrategyWorkerRequest | WorkerEnvelope) => 
                 const raw = req.type ?? 'unknown'
                 if (raw === 'contextBuild') return 'context'
                 if (raw === 'turnEnd') return 'turnEnd'
+                if (raw === 'cloudAdd') return 'cloudAdd'
+                if (raw === 'cloudRemove') return 'cloudRemove'
                 if (raw === 'toolCall') return 'toolCall'
                 if (raw === 'replayTurn') return 'replay'
                 if (raw === 'init') return 'init'

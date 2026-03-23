@@ -1,5 +1,7 @@
 import type { Database } from 'better-sqlite3'
 import type {
+    CloudAddPayload,
+    CloudRemovePayload,
     StrategyContextBuildResult,
     StrategyReplayTurnInput,
     StrategyRecord,
@@ -38,6 +40,37 @@ export class StrategyHost {
 
     private resolveStrategyRecord(conversationId: string): StrategyRecord {
         return getStrategyOrFallback(this.db, { conversationId }).strategy
+    }
+
+    private async runOptionalHook(args: {
+        conversationId: string
+        hookName: 'onCloudAdd' | 'onCloudRemove'
+        requestType: 'cloudAdd' | 'cloudRemove'
+        payload: CloudAddPayload | CloudRemovePayload
+    }): Promise<void> {
+        try {
+            const strategyRecord = this.resolveStrategyRecord(args.conversationId)
+            const configValues = buildStrategyRuntimeConfig(this.db, strategyRecord)
+            if (args.requestType === 'cloudAdd') {
+                await workerManager.requestCloudAdd(args.conversationId, {
+                    conversationId: args.conversationId,
+                    strategyId: strategyRecord.id,
+                    strategyEntryPath: strategyRecord.entry_path,
+                    configValues,
+                    cloudPayload: args.payload,
+                })
+                return
+            }
+            await workerManager.requestCloudRemove(args.conversationId, {
+                conversationId: args.conversationId,
+                strategyId: strategyRecord.id,
+                strategyEntryPath: strategyRecord.entry_path,
+                configValues,
+                cloudPayload: args.payload,
+            })
+        } catch (err) {
+            console.warn(`[strategy] worker ${args.hookName} failed, ignored`, err)
+        }
     }
 
     async runContextBuild(args: {
@@ -390,6 +423,30 @@ export class StrategyHost {
         } catch (err) {
             console.warn('[strategy] worker replayTurn failed, ignored', err)
         }
+    }
+
+    async runCloudAdd(args: {
+        conversationId: string
+        payload: CloudAddPayload
+    }): Promise<void> {
+        await this.runOptionalHook({
+            conversationId: args.conversationId,
+            hookName: 'onCloudAdd',
+            requestType: 'cloudAdd',
+            payload: args.payload,
+        })
+    }
+
+    async runCloudRemove(args: {
+        conversationId: string
+        payload: CloudRemovePayload
+    }): Promise<void> {
+        await this.runOptionalHook({
+            conversationId: args.conversationId,
+            hookName: 'onCloudRemove',
+            requestType: 'cloudRemove',
+            payload: args.payload,
+        })
     }
 
     async runToolCall(args: {
