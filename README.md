@@ -1,11 +1,30 @@
-# AfferLab
+<p align="center">
+  <img src="https://raw.githubusercontent.com/afferlab/afferlab/main/public/readmelogo.svg" width="120" />
+</p>
 
-> Strategy-driven AI workspace with programmable conversations.
+<h1 align="center">AfferLab</h1>
 
-![License](https://img.shields.io/github/license/YOUR_GITHUB_USERNAME/afferlab)
-![Stars](https://img.shields.io/github/stars/YOUR_GITHUB_USERNAME/afferlab)
-![Issues](https://img.shields.io/github/issues/YOUR_GITHUB_USERNAME/afferlab)
-![PRs](https://img.shields.io/github/issues-pr/YOUR_GITHUB_USERNAME/afferlab)
+<p align="center">
+  Strategy-driven AI workspace with programmable conversations.
+</p>
+
+<p align="center">
+
+<img src="https://img.shields.io/github/license/afferlab/afferlab?style=for-the-badge" />
+  <a href="https://x.com/afferlab">
+    <img src="https://img.shields.io/badge/X-Follow-black?style=for-the-badge&logo=twitter" />
+  </a>
+  <a href="https://www.reddit.com/user/AfferLab/">
+    <img src="https://img.shields.io/badge/Reddit-Profile-FF4500?style=for-the-badge&logo=reddit&logoColor=white" />
+  </a>
+  <a href="https://www.afferlab.com">
+    <img src="https://img.shields.io/badge/Website-Visit-black?style=for-the-badge&logo=google-chrome&logoColor=white" />
+  </a>
+</p>
+
+<p align="center">
+  ⚠️ <i>AfferLab is in early development. Expect breaking changes.</i>
+</p>
 
 ---
 
@@ -41,8 +60,6 @@ AfferLab is designed for **developers who want full control over AI workflows.**
 
 ## Core Architecture
 
-AfferLab is built around several core systems:
-
 ```text
 Strategy Engine
 │
@@ -52,58 +69,13 @@ Strategy Engine
 └── Memory / Attachment Ingest
 ```
 
-High-level flow:
-
-```text
-User Message
-↓
-Strategy Execution
-↓
-Context Builder
-↓
-LLM Runner
-↓
-Streaming Response
-```
-
-Full architecture documentation:
-
-`docs/architecture`
-
----
-
-## Supported Models
-
-AfferLab supports multiple AI providers:
-
-- OpenAI
-- Google Gemini
-- Anthropic Claude
-- DeepSeek
-- Ollama / Local models
-- LM Studio
-
-Models are defined through a flexible **models registry system**.
-
 ---
 
 ## Getting Started
 
-Clone the repository:
-
 ```bash
-git clone https://github.com/victor-YT/afferlab
-```
-
-Install dependencies:
-
-```bash
+git clone https://github.com/afferlab/afferlab
 pnpm install
-```
-
-Run development build:
-
-```bash
 pnpm dev
 ```
 
@@ -111,39 +83,16 @@ pnpm dev
 
 ## Documentation
 
-Full documentation is available in:
-
-`/docs`
-
-Key sections include:
-
-- architecture
-- strategies
-- model system
-- attachment ingest pipeline
+See [documentation](https://docs.afferlab.com)
 
 ---
 
 ## Project Status
 
-AfferLab is currently in early development.
-
-APIs, database schema, and internal systems may change.
-
----
-
-## Contributing
-
-Contributions are welcome.
-
-If you would like to contribute:
-
-1. Fork the repository
-2. Create a feature branch
-3. Submit a pull request
+Early development. APIs and systems may change.
 
 ---
 
 ## License
 
-MIT License
+MIT
