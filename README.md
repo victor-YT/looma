@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/afferlab/afferlab/main/public/readmelogo.svg" width="120" />
+  <img src="https://raw.githubusercontent.com/afferlab/afferlab/main/public/readmelogo.svg" width="220" alt="AfferLab logo"/>
 </p>
 
 <h1 align="center">AfferLab</h1>
@@ -10,16 +10,20 @@
 
 <p align="center">
 
-<img src="https://img.shields.io/github/license/afferlab/afferlab?style=for-the-badge" />
-  <a href="https://x.com/afferlab">
-    <img src="https://img.shields.io/badge/X-Follow-black?style=for-the-badge&logo=twitter" />
-  </a>
-  <a href="https://www.reddit.com/user/AfferLab/">
-    <img src="https://img.shields.io/badge/Reddit-Profile-FF4500?style=for-the-badge&logo=reddit&logoColor=white" />
-  </a>
-  <a href="https://www.afferlab.com">
-    <img src="https://img.shields.io/badge/Website-Visit-black?style=for-the-badge&logo=google-chrome&logoColor=white" />
-  </a>
+<img src="https://img.shields.io/github/license/afferlab/afferlab?style=for-the-badge" alt="License"/>
+
+<a href="https://x.com/afferlab" style="text-decoration:none;">
+  <img src="https://img.shields.io/badge/X-Follow-black?style=for-the-badge&logo=twitter" alt="X"/>
+</a>
+
+<a href="https://www.reddit.com/user/AfferLab/" style="text-decoration:none;">
+  <img src="https://img.shields.io/badge/Reddit-Profile-FF4500?style=for-the-badge&logo=reddit&logoColor=white" alt="Reddit"/>
+</a>
+
+<a href="https://www.afferlab.com" style="text-decoration:none;">
+  <img src="https://img.shields.io/badge/Website-Visit-white?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Website"/>
+</a>
+
 </p>
 
 <p align="center">
