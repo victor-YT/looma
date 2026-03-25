@@ -2,6 +2,35 @@ import type { TurnAttachment, UIMessage } from '../../../../contracts/index'
 import { toLegacyAttachmentPart } from '../../../llm/adapters/messageParts'
 import { parseMessageContentParts } from '../../../../shared/chat/contentParts'
 
+type FileLikePart = Extract<ReturnType<typeof parseMessageContentParts>[number], { type: 'file' | 'image' }>
+
+function toComparableText(message: UIMessage): string {
+    return typeof message.content === 'string' ? message.content : ''
+}
+
+function getFileLikeParts(message: UIMessage): FileLikePart[] {
+    return parseMessageContentParts(message.contentParts, message.content)
+        .filter((part): part is FileLikePart => part.type === 'file' || part.type === 'image')
+}
+
+function sameAttachmentParts(a: FileLikePart[], b: FileLikePart[]): boolean {
+    if (a.length !== b.length) return false
+    for (let i = 0; i < a.length; i += 1) {
+        const left = a[i]
+        const right = b[i]
+        if (
+            left.type !== right.type
+            || left.assetId !== right.assetId
+            || left.name !== right.name
+            || left.mimeType !== right.mimeType
+            || left.size !== right.size
+        ) {
+            return false
+        }
+    }
+    return true
+}
+
 export function buildPreparedMessagesForStream(args: {
     strategyMessages: UIMessage[]
     parentUserId: string
@@ -32,6 +61,17 @@ export function buildPreparedMessagesForStream(args: {
             contentParts: currentParts,
         }
         return next
+    }
+    const currentText = typeof args.inputText === 'string' ? args.inputText : ''
+    const currentFileParts = currentParts.filter((part): part is FileLikePart => part.type === 'file' || part.type === 'image')
+    const hasMatchingUserMessage = args.strategyMessages.some((message) => {
+        if (message.role !== 'user') return false
+        if (toComparableText(message) !== currentText) return false
+        if (currentFileParts.length === 0) return true
+        return sameAttachmentParts(getFileLikeParts(message), currentFileParts)
+    })
+    if (hasMatchingUserMessage) {
+        return args.strategyMessages
     }
 
     return [
