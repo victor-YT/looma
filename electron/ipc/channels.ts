@@ -91,6 +91,8 @@ export const IPC = {
     STREAM_DONE: 'llm-stream-done',
     ABORT_STREAM: 'abort-stream',
     IS_CONV_BUSY: 'is-conversation-busy',
+    UPDATE_READY: 'update-ready',
+    UPDATE_RESTART: 'update-restart',
 
     STRATEGY_REPLAY_STARTED: 'strategy-replay-started',
     STRATEGY_REPLAY_PROGRESS: 'strategy-replay-progress',

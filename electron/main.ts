@@ -1,4 +1,4 @@
-import { app, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import { autoUpdater } from 'electron-updater'
 
 app.setName('AfferLab')
@@ -15,6 +15,8 @@ import { createMainWindow } from './app/main/createMainWindow'
 import { registerRuntime } from './app/bootstrap/registerRuntime'
 import { applyNativeTheme, isThemeSource, registerThemeIPC } from './app/theme/nativeTheme'
 import { registerStrategies } from './strategies'
+import { IPC } from './ipc/channels'
+import type { UpdateReadyPayload } from '../contracts/ipc/updaterAPI'
 
 dotenv.config()
 
@@ -105,6 +107,10 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
 function initAutoUpdater(): void {
+    ipcMain.on(IPC.UPDATE_RESTART, () => {
+        autoUpdater.quitAndInstall()
+    })
+
     if (!app.isPackaged) {
         console.log('[updater] skipped in development')
         return
@@ -128,6 +134,13 @@ function initAutoUpdater(): void {
 
     autoUpdater.on('update-downloaded', (info) => {
         console.log(`[updater] update downloaded: ${info.version}`)
+        const payload: UpdateReadyPayload = {
+            version: info.version,
+        }
+        for (const win of BrowserWindow.getAllWindows()) {
+            if (win.isDestroyed()) continue
+            win.webContents.send(IPC.UPDATE_READY, payload)
+        }
     })
 
     void autoUpdater.checkForUpdatesAndNotify().catch((error) => {

@@ -28,6 +28,16 @@ export function safeOn<T>(
     return () => ipcRenderer.removeListener(channel, wrapped)
 }
 
+export function safeSend<A extends unknown[] = unknown[]>(
+    channel: AllowedChannel,
+    ...args: A
+): void {
+    if (!allowed.has(channel)) {
+        throw new Error(`IPC channel not allowed: ${channel as string}`)
+    }
+    ipcRenderer.send(channel, ...args)
+}
+
 export function safeRemoveAll(channel: AllowedChannel): void {
     if (!allowed.has(channel)) {
         throw new Error(`IPC channel not allowed: ${channel as string}`)

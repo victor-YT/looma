@@ -5,6 +5,7 @@ import ChatPage from "@/features/chat/pages/ChatPage"
 import SettingsPage from "@/features/settings/shell/SettingsPage"
 import AfferLabHome from "@/features/home/pages/AfferLabHome"
 import ChatShell from "@/features/chat/pages/ChatShell"
+import UpdateModal from "@/components/UpdateModal"
 
 // Settings subpages
 import ModelSettings from "@/features/models/providers/pages/ModelSettings"
@@ -37,6 +38,7 @@ export default function App() {
                             <Route path="privacy" element={<PrivacySettings />} />
                         </Route>
                     </Routes>
+                    <UpdateModal />
                     <Toaster />
                 </div>
             </ThemeProvider>
