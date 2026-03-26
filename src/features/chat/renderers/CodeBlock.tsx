@@ -2,8 +2,10 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy } from 'lucide-react'
 import clsx from 'clsx'
 import { bundledLanguages, getSingletonHighlighter } from 'shiki'
+import { useThemeStore } from '@/features/settings/general/state/themeStore'
 
-const SHIKI_THEME = 'dark-plus'
+const SHIKI_LIGHT_THEME = 'min-light'
+const SHIKI_DARK_THEME = 'min-dark'
 const FALLBACK_LANGUAGE = 'text'
 const PRELOADED_LANGUAGES = [
     'text',
@@ -32,7 +34,7 @@ let highlighterPromise: Promise<Awaited<ReturnType<typeof getSingletonHighlighte
 function getCodeHighlighter() {
     if (!highlighterPromise) {
         highlighterPromise = getSingletonHighlighter({
-            themes: [SHIKI_THEME],
+            themes: [SHIKI_LIGHT_THEME, SHIKI_DARK_THEME],
             langs: [...PRELOADED_LANGUAGES],
         })
     }
@@ -47,7 +49,16 @@ function normalizeLanguage(input?: string | null): string {
     return value
 }
 
-async function renderHighlightedHtml(code: string, language?: string | null): Promise<string> {
+function formatLanguageLabel(language: string): string {
+    if (!language) return ''
+    return language.charAt(0).toUpperCase() + language.slice(1)
+}
+
+async function renderHighlightedHtml(
+    code: string,
+    language: string | null | undefined,
+    theme: 'light' | 'dark',
+): Promise<string> {
     const highlighter = await getCodeHighlighter()
     const normalized = normalizeLanguage(language)
     const resolved = highlighter.resolveLangAlias(normalized) ?? normalized
@@ -66,7 +77,7 @@ async function renderHighlightedHtml(code: string, language?: string | null): Pr
     const finalLanguage = highlighter.getLanguage(resolved) ? resolved : FALLBACK_LANGUAGE
     return highlighter.codeToHtml(code, {
         lang: finalLanguage,
-        theme: SHIKI_THEME,
+        theme: theme === 'dark' ? SHIKI_DARK_THEME : SHIKI_LIGHT_THEME,
     })
 }
 
@@ -83,14 +94,44 @@ const CodeBlock = memo(function CodeBlock({
     closed = true,
     className,
 }: CodeBlockProps) {
+    const themePreference = useThemeStore((state) => state.theme)
     const [copied, setCopied] = useState(false)
     const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null)
+    const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() => {
+        if (typeof window === 'undefined') return 'light'
+        if (themePreference === 'system') {
+            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        }
+        return themePreference
+    })
     const timeoutRef = useRef<number | null>(null)
 
     const normalizedLanguage = useMemo(
         () => normalizeLanguage(language),
         [language],
     )
+    const languageLabel = useMemo(
+        () => formatLanguageLabel(normalizedLanguage),
+        [normalizedLanguage],
+    )
+
+    useEffect(() => {
+        if (themePreference !== 'system') {
+            setResolvedTheme(themePreference)
+            return
+        }
+
+        const media = window.matchMedia('(prefers-color-scheme: dark)')
+        const apply = () => {
+            setResolvedTheme(media.matches ? 'dark' : 'light')
+        }
+
+        apply()
+        media.addEventListener('change', apply)
+        return () => {
+            media.removeEventListener('change', apply)
+        }
+    }, [themePreference])
 
     useEffect(() => {
         let cancelled = false
@@ -102,7 +143,7 @@ const CodeBlock = memo(function CodeBlock({
             }
         }
 
-        void renderHighlightedHtml(code, normalizedLanguage)
+        void renderHighlightedHtml(code, normalizedLanguage, resolvedTheme)
             .then((html) => {
                 if (cancelled) return
                 setHighlightedHtml(html)
@@ -115,7 +156,7 @@ const CodeBlock = memo(function CodeBlock({
         return () => {
             cancelled = true
         }
-    }, [closed, code, normalizedLanguage])
+    }, [closed, code, normalizedLanguage, resolvedTheme])
 
     useEffect(() => {
         return () => {
@@ -144,13 +185,14 @@ const CodeBlock = memo(function CodeBlock({
     return (
         <div
             className={clsx(
-                'my-3 overflow-hidden rounded-xl border border-white/10 bg-[#0d1117] text-slate-100',
+                'afferlab-code-block my-3 overflow-hidden rounded-xl border border-[#dfdfe3] bg-[#f5f5f7] text-[#2c2c2e]',
+                'dark:border-[#2c2c2e] dark:bg-[#1c1c1e] dark:text-[#f2f2f7]',
                 className,
             )}
         >
-            <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/[0.03] px-3 py-2">
-                <span className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                    {normalizedLanguage}
+            <div className="flex items-center justify-between gap-3 border-b border-[#dfdfe3] bg-[#ececf1] px-3 py-1.5 dark:border-[#2c2c2e] dark:bg-[#232326]">
+                <span className="truncate text-[12px] font-semibold text-[#6e6e73] dark:text-[#a1a1a6]">
+                    {languageLabel}
                 </span>
 
                 <button
@@ -158,8 +200,9 @@ const CodeBlock = memo(function CodeBlock({
                     onClick={handleCopy}
                     className={clsx(
                         'ui-fast inline-flex items-center gap-1.5 rounded-md px-2 py-1',
-                        'cursor-pointer text-xs font-medium text-slate-300 transition-colors',
-                        'hover:bg-white/8 hover:text-white',
+                        'cursor-pointer text-xs font-semibold text-[#636366] transition-colors',
+                        'hover:text-[#1d1d1f] focus:outline-none focus:ring-0 focus-visible:outline-none',
+                        'dark:text-[#b0b0b5] dark:hover:text-[#f2f2f7]',
                     )}
                     aria-label={copied ? 'Code copied' : 'Copy code'}
                     title={copied ? 'Copied' : 'Copy'}
@@ -173,15 +216,15 @@ const CodeBlock = memo(function CodeBlock({
                 {highlightedHtml && closed ? (
                     <div
                         className={clsx(
-                            'text-[13px] leading-6',
+                            'text-[13px] leading-[1.45]',
                             '[&_.shiki]:!bg-transparent [&_.shiki]:m-0 [&_.shiki]:p-0',
-                            '[&_.shiki]:text-[13px] [&_.shiki]:leading-6',
+                            '[&_.shiki]:text-[13px] [&_.shiki]:leading-[1.45]',
                             '[&_.shiki_code]:font-mono [&_.shiki_code]:whitespace-pre',
                         )}
                         dangerouslySetInnerHTML={{ __html: highlightedHtml }}
                     />
                 ) : (
-                    <pre className="m-0 overflow-x-auto bg-transparent p-0 font-mono text-[13px] leading-6 text-slate-100">
+                    <pre className="m-0 overflow-x-auto bg-transparent p-0 font-mono text-[13px] leading-[1.45] text-[#2c2c2e] dark:text-[#f2f2f7]">
                         <code>{code}</code>
                     </pre>
                 )}

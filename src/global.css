@@ -142,6 +142,19 @@ body {
     font-weight: 400;
 }
 
+.afferlab-code-block .shiki,
+.afferlab-code-block .shiki code {
+    background: transparent !important;
+    font-family: var(--font-mono) !important;
+    font-size: 13px !important;
+    line-height: 1.45 !important;
+}
+
+.afferlab-code-block .shiki {
+    filter: saturate(0.9);
+    opacity: 0.96;
+}
+
 pre,
 code,
 kbd,

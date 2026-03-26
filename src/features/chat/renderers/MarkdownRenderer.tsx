@@ -52,12 +52,22 @@ const MarkdownRenderer = memo(function MarkdownRenderer({
     const components = useMemo<Components>(() => ({
         a: (props) => <LinkRenderer {...props} />,
         p: (props) => <p {...props} className="my-2 leading-6 text-tx" />,
-        h1: (props) => <h1 {...props} className="mt-4 mb-2 text-[1.3rem] font-semibold tracking-tight text-tx" />,
-        h2: (props) => <h2 {...props} className="mt-4 mb-2 text-[1.15rem] font-semibold tracking-tight text-tx" />,
-        h3: (props) => <h3 {...props} className="mt-3 mb-2 text-[1.02rem] font-semibold tracking-tight text-tx" />,
+        h1: (props) => <h1 {...props} className="mt-5 mb-3 text-[1.42rem] font-bold tracking-tight text-tx" />,
+        h2: (props) => <h2 {...props} className="mt-5 mb-3 text-[1.26rem] font-semibold tracking-tight text-tx" />,
+        h3: (props) => <h3 {...props} className="mt-4 mb-2 text-[1.12rem] font-semibold tracking-tight text-tx" />,
+        h4: (props) => <h4 {...props} className="mt-4 mb-2 text-[1.02rem] font-semibold tracking-tight text-tx" />,
+        h5: (props) => <h5 {...props} className="mt-3 mb-2 text-[0.97rem] font-semibold tracking-tight text-tx" />,
+        h6: (props) => <h6 {...props} className="mt-3 mb-2 text-[0.9rem] font-medium tracking-tight text-tx/78" />,
         ul: (props) => <ul {...props} className="my-3 list-disc space-y-1 pl-5 text-tx" />,
         ol: (props) => <ol {...props} className="my-3 list-decimal space-y-1 pl-5 text-tx" />,
         li: (props) => <li {...props} className="leading-6" />,
+        img: (props) => (
+            <img
+                {...props}
+                className="my-3 max-w-full rounded-xl"
+                loading="lazy"
+            />
+        ),
         blockquote: (props) => (
             <blockquote
                 {...props}
