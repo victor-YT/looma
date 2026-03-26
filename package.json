@@ -15,12 +15,10 @@
       "node_modules/.pnpm/better-sqlite3@*/node_modules/better-sqlite3/build/**/*"
     ],
     "npmRebuild": true,
-
     "directories": {
       "buildResources": "build",
       "output": "release/${version}"
     },
-
     "files": [
       "dist",
       "dist-electron",
@@ -28,21 +26,21 @@
       "node_modules/.pnpm/bindings@*/node_modules/bindings/**/*",
       "node_modules/.pnpm/file-uri-to-path@*/node_modules/file-uri-to-path/**/*"
     ],
-
     "mac": {
       "icon": "build/icon.icns",
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "artifactName": "${productName}-Mac-${version}-Installer.${ext}",
       "hardenedRuntime": true,
+      "notarize": true,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist"
     },
-
     "win": {
       "icon": "build/icon.ico",
       "artifactName": "${productName}-Windows-${version}-Setup.${ext}"
     },
-
     "linux": {
       "icon": "build/icon.png",
       "artifactName": "${productName}-Linux-${version}.${ext}"
@@ -69,7 +67,6 @@
         }
       ]
     },
-
     "publish": [
       {
         "provider": "github",
@@ -88,7 +85,7 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm run clean && pnpm run copy-config && vite",
-    "build": "pnpm run clean && tsc && vite build && electron-builder",
+    "build": "cross-env sh -c 'pnpm run clean && tsc && vite build && electron-builder'",
     "rebuild": "electron-rebuild",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
@@ -118,15 +115,16 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "corner-smoothing": "^0.1.5",
+    "cross-env": "^10.1.0",
     "dotenv": "^17.3.1",
+    "electron-updater": "^6.6.2",
     "esbuild": "^0.21.5",
+    "file-uri-to-path": "^1.0.0",
     "framer-motion": "^11.18.2",
     "lucide-react": "^0.541.0",
     "next-themes": "^0.4.6",
     "pdf-parse": "^1.1.1",
     "prebuild-install": "^7.1.3",
-    "electron-updater": "^6.6.2",
-    "file-uri-to-path": "^1.0.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-markdown": "^10.1.0",
