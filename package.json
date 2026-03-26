@@ -1,6 +1,8 @@
 {
   "name": "afferlab",
   "productName": "AfferLab",
+  "description": "Strategy-driven AI workspace",
+  "author": "AfferLab",
   "private": true,
   "license": "MIT",
   "version": "0.1.0",
