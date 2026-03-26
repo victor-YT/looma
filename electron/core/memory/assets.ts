@@ -157,6 +157,7 @@ export function queryMemoryRecords(
         FROM memory_items m
         WHERE m.scope_type = 'conversation'
           AND m.scope_id = ?
+          AND m.type != 'attachment.message'
     `).all(args.conversationId) as Array<{
         id: string
         type: string
@@ -292,7 +293,9 @@ export function listAssets(
                   AND mc.strategy_version = ?
             ) AS chunk_count
         FROM memory_assets a
+        JOIN memory_items m ON m.id = a.memory_id
         WHERE a.conversation_id = ?
+          AND m.type != 'attachment.message'
         ORDER BY a.created_at DESC
     `).all(scope.strategyKey, scope.strategyVersion, args.conversationId) as Array<{
         id: string
