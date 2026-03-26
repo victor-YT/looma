@@ -70,7 +70,9 @@
 
     "publish": [
       {
-        "provider": "github"
+        "provider": "github",
+        "owner": "afferlab",
+        "repo": "afferlab"
       }
     ],
     "extraResources": [

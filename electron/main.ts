@@ -237,6 +237,7 @@ function openSplashWindow(): BrowserWindow {
     return win
 }
 
+
 function openStartupWindows(): void {
     const bounceId = isMac ? (app.dock.bounce as (type: string) => number)('indefinite') : null
     const splash = isMac ? null : openSplashWindow()
@@ -252,6 +253,8 @@ function openStartupWindows(): void {
         if (!win.isDestroyed()) {
             win.show()
         }
+        registerStrategies()
+        initAutoUpdater()
     })
 }
 
@@ -272,11 +275,8 @@ app.whenReady().then(async () => {
   const appSettings = getAppSettings(getDB())
   applyNativeTheme(isThemeSource(appSettings.theme_mode) ? appSettings.theme_mode : 'system')
 
-  registerStrategies()
-
   registerAllIPC()
   console.log('IPC registered')
 
-  initAutoUpdater()
   openStartupWindows()
 })
