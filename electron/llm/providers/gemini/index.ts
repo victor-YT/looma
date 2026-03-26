@@ -33,12 +33,13 @@ function startGeminiChat(
     opts?: { nativeSearch?: boolean }
 ) {
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({
+    const modelParams = {
         model: modelId,
         ...(opts?.nativeSearch
-            ? { tools: [{ googleSearchRetrieval: {} }] }
+            ? { tools: [{ googleSearch: {} }] }
             : {}),
-    })
+    } as unknown as Parameters<typeof genAI.getGenerativeModel>[0]
+    const model = genAI.getGenerativeModel(modelParams)
     // Key behavior: exclude the last user message and ensure the first message is from the user
     const his = toGeminiHistory(history, { excludeLastUser: true })
     const cfg = toGeminiConfig(
