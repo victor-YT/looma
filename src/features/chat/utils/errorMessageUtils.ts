@@ -123,8 +123,8 @@ export function normalizeErrorSummary(input: ErrorMessageContext): string {
     const code = asText(input.message.errorCode)
     const errorMessage = extractErrorText(asText(input.message.errorMessage))
     if (code === "UploadingInProgress") return "Wait for uploads to finish."
-    if (code === "ModelDoesNotSupportFiles") return "Current model does not support file attachments."
-    if (code === "UnsupportedAttachmentType") return "Current model does not support one or more attached file types."
+    if (code === "ModelDoesNotSupportFiles") return "The selected model does not support file attachments."
+    if (code === "UnsupportedAttachmentType") return "This file type is not supported by the selected model."
     if (code === "AttachmentTooLarge") return "Attachment exceeds model file size limit."
     if (code === "TooManyAttachments") return "Too many attachments for this turn."
     if (code === "AttachmentUploading") return "Attachment is still uploading."
@@ -175,6 +175,24 @@ export function normalizeErrorSummary(input: ErrorMessageContext): string {
     ])
     if (missingModelHit) {
         return "Selected model ID is invalid or unavailable for this provider."
+    }
+
+    const attachmentCapabilityHit = firstMatch(signals, [
+        "unsupported mime type",
+        "provider has no native file/media transport",
+        "does not support file attachments",
+        "does not support one or more attachment mime types",
+        "does not support one or more attached file types",
+        "modeldoesnotsupportfiles",
+        "unsupportedattachmenttype",
+    ])
+    if (attachmentCapabilityHit) {
+        if (attachmentCapabilityHit === "provider has no native file/media transport"
+            || attachmentCapabilityHit === "does not support file attachments"
+            || attachmentCapabilityHit === "modeldoesnotsupportfiles") {
+            return "The selected model does not support file attachments."
+        }
+        return "This file type is not supported by the selected model."
     }
 
     const looksLikeModelError = input.turnStatus === "error"
