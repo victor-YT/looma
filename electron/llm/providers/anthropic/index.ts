@@ -1,5 +1,7 @@
+import { Buffer } from 'node:buffer'
 import type { Provider, StreamGen } from '../../common'
 import type { LLMParams, ToolDef, TurnAttachment, UIMessage } from '../../../../contracts/index'
+import { appendLegacyAttachmentsToLastUser, getMessageParts, getMessageText } from '../../adapters/messageParts'
 import { normalizeError } from '../../adapters/error'
 
 const DEFAULT_BASE_URL = 'https://api.anthropic.com'
@@ -7,17 +9,80 @@ const ANTHROPIC_VERSION = '2023-06-01'
 
 type AnthropicMessage = {
     role: 'user' | 'assistant'
-    content: string
+    content: string | AnthropicContentBlock[]
 }
+
+type AnthropicContentBlock =
+    | { type: 'text'; text: string }
+    | {
+        type: 'image'
+        source: {
+            type: 'base64'
+            media_type: string
+            data: string
+        }
+    }
+    | {
+        type: 'document'
+        source: {
+            type: 'base64'
+            media_type: 'application/pdf'
+            data: string
+        }
+    }
 
 function toAnthropicMessages(history: UIMessage[]): { system?: string; messages: AnthropicMessage[] } {
     const systemMessages = history.filter((msg) => msg.role === 'system')
-    const system = systemMessages.map((msg) => msg.content).filter(Boolean).join('\n')
+    const system = systemMessages.map((msg) => getMessageText(msg)).filter(Boolean).join('\n')
     const messages: AnthropicMessage[] = []
     for (const msg of history) {
         if (msg.role === 'system') continue
         const role = msg.role === 'assistant' ? 'assistant' : 'user'
-        messages.push({ role, content: msg.content ?? '' })
+        if (role === 'assistant') {
+            messages.push({ role, content: getMessageText(msg) })
+            continue
+        }
+        const parts = getMessageParts(msg)
+        if (parts.length === 0) {
+            messages.push({ role, content: msg.content ?? '' })
+            continue
+        }
+        const content: AnthropicContentBlock[] = []
+        for (const part of parts) {
+            if (part.type === 'text') {
+                if (part.text.trim()) content.push({ type: 'text', text: part.text })
+                continue
+            }
+            if (!part.data || part.data.length === 0) {
+                throw new Error(`AttachmentDataMissing: ${part.name}`)
+            }
+            const mimeType = (part.mimeType || 'application/octet-stream').trim().toLowerCase()
+            const data = Buffer.from(part.data).toString('base64')
+            if (mimeType.startsWith('image/')) {
+                content.push({
+                    type: 'image',
+                    source: {
+                        type: 'base64',
+                        media_type: mimeType,
+                        data,
+                    },
+                })
+                continue
+            }
+            if (mimeType === 'application/pdf') {
+                content.push({
+                    type: 'document',
+                    source: {
+                        type: 'base64',
+                        media_type: 'application/pdf',
+                        data,
+                    },
+                })
+                continue
+            }
+            throw new Error(`UnsupportedAttachmentType: ${mimeType}`)
+        }
+        messages.push({ role, content })
     }
     return { system: system || undefined, messages }
 }
@@ -91,29 +156,24 @@ function rethrow(err: unknown, httpStatus?: number): never {
 
 export const AnthropicProvider: Provider = {
     id: 'anthropic',
-    capabilities: {
-        nativeFiles: false,
-        supportedMimeTypes: [],
-    },
     supports: () => true,
 
     async *stream(
-        { modelId, history, params, attachments }: {
+        { modelId, history, params, attachments, inputText }: {
             modelId: string
             history: UIMessage[]
             params?: LLMParams
             tools?: ToolDef[]
             attachments?: TurnAttachment[]
+            inputText?: string
         },
         ctx
     ): StreamGen {
         try {
-            if (attachments && attachments.length > 0) {
-                throw new Error('ModelDoesNotSupportFiles: provider has no native file/media transport')
-            }
             if (!ctx.apiKey) throw new Error('API key missing')
             const baseUrl = (ctx.baseUrl || DEFAULT_BASE_URL).replace(/\/$/, '')
-            const { system, messages } = toAnthropicMessages(history)
+            const mergedHistory = appendLegacyAttachmentsToLastUser(history, attachments, inputText)
+            const { system, messages } = toAnthropicMessages(mergedHistory)
             const payload = {
                 model: modelId,
                 messages,
@@ -143,22 +203,21 @@ export const AnthropicProvider: Provider = {
     },
 
     async complete(
-        { modelId, history, params, attachments }: {
+        { modelId, history, params, attachments, inputText }: {
             modelId: string
             history: UIMessage[]
             params?: LLMParams
             tools?: ToolDef[]
             attachments?: TurnAttachment[]
+            inputText?: string
         },
         ctx
     ): Promise<string> {
         try {
-            if (attachments && attachments.length > 0) {
-                throw new Error('ModelDoesNotSupportFiles: provider has no native file/media transport')
-            }
             if (!ctx.apiKey) throw new Error('API key missing')
             const baseUrl = (ctx.baseUrl || DEFAULT_BASE_URL).replace(/\/$/, '')
-            const { system, messages } = toAnthropicMessages(history)
+            const mergedHistory = appendLegacyAttachmentsToLastUser(history, attachments, inputText)
+            const { system, messages } = toAnthropicMessages(mergedHistory)
             const payload = {
                 model: modelId,
                 messages,

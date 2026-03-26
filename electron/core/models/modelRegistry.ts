@@ -109,6 +109,7 @@ function buildDynamicModel(
 ): LLMModelConfig {
     const label = options?.name?.trim() || modelId
     const source = options?.source ?? 'remote'
+    const providerCaps = getProviderNativeFileCapabilities(providerId)
     return {
         id: modelId,
         label,
@@ -117,6 +118,7 @@ function buildDynamicModel(
         kind: 'chat',
         capabilities: {
             ...defaultCapabilities,
+            ...providerCaps,
             tools: false,
             json: false,
             vision: false,

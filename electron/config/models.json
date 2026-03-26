@@ -225,7 +225,16 @@
       "json": true,
       "vision": true,
       "reasoning": false,
-      "nativeSearch": false
+      "nativeSearch": false,
+      "nativeFiles": true,
+      "supportedMimeTypes": [
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "application/pdf"
+      ],
+      "attachmentTransport": "inline_parts"
     },
     "limits": {
       "maxContextTokens": 200000,
@@ -252,7 +261,16 @@
       "json": true,
       "vision": true,
       "reasoning": false,
-      "nativeSearch": false
+      "nativeSearch": false,
+      "nativeFiles": true,
+      "supportedMimeTypes": [
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "application/pdf"
+      ],
+      "attachmentTransport": "inline_parts"
     },
     "limits": {
       "maxContextTokens": 200000,

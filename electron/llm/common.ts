@@ -17,8 +17,12 @@ export interface ProviderCtx {
 
 export interface Provider {
     id: string
+    // Declare attachment capabilities here when they apply uniformly to the provider.
+    // If support varies by model, prefer overriding capabilities in models.json.
     capabilities?: Partial<Pick<ModelCapabilities, 'nativeFiles' | 'supportedMimeTypes' | 'maxFileSizeMB' | 'maxFilesPerTurn' | 'attachmentTransport'>>
     supports: (modelId: string) => boolean
+    // Providers receive hydrated UI history plus optional turn-scoped attachments/inputText.
+    // Adapters are responsible for mapping that data into provider-native payloads.
     stream(
         args: {
             modelId: string

@@ -10,4 +10,9 @@ export const LMStudioProvider = createOpenAICompatibleProvider({
     defaultBaseUrl: 'http://127.0.0.1:1234/v1',
     requireApiKey: false,
     normalizeBaseUrl: normalizeLmStudioBase,
+    capabilities: {
+        nativeFiles: true,
+        supportedMimeTypes: ['image/*'],
+        attachmentTransport: 'inline_base64',
+    },
 })
